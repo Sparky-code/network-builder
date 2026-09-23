@@ -2,13 +2,16 @@ import type {
   ClassMetrics, Demand, LatencyWaterfall, MetricsFrame, NodeId, Region, RegionId,
   RunResult, TrafficClass,
 } from '@nb/schema';
-import { buildGraph, edgeCost, enumerateRoutes, type Route, type SimGraph } from './graph';
+import {
+  buildGraph, edgeCost, enumerateRoutes, firstTierCaches,
+  type Route, type SimGraph,
+} from './graph';
 import { buildKernel, type LatencyKernel } from './kernel';
 import { departureCv2, mergeCv2 } from './math/erlang';
 import { sampleRoute } from './probes';
 import { pool, pooledQuantile, pooledTailFraction, type WeightedPopulation } from './pooled';
 import { cacheHitRatio, relaxWarmth } from './cache';
-import { capacityRps, serveTick, type SimEdge, type Station } from './station';
+import { applyControllers, capacityRps, serveTick, type SimEdge, type Station } from './station';
 import { rateAt } from './rate';
 import { computeCost, DEFAULT_COST_RATES, type CostRates } from './cost';
 import { hashString } from './rng';
@@ -70,6 +73,8 @@ export function simulate(input: SimInput): RunResult {
   const classIdx = new Map(classes.map((c, i) => [c.id, i]));
 
   const isEntry = new Set<NodeId>(graph.entries);
+  // Which caches a request meets first. Everything behind them is a mid tier.
+  const isFirstTierCache = firstTierCaches(graph);
 
   const nodeAccum = new Map<NodeId, NodeAccum>();
   for (const id of graph.order) {
@@ -101,7 +106,6 @@ export function simulate(input: SimInput): RunResult {
   let runCompleted = 0;
   let runLost = 0;
   let hitAcc = 0;
-  let missAcc = 0;
   let edgeHitAcc = 0;
   let edgeArrivalAcc = 0;
 
@@ -191,6 +195,23 @@ export function simulate(input: SimInput): RunResult {
 
       station.backlogReqs = served.newBacklogReqs;
 
+      // Controllers run at the end of a station's tick, so any capacity change
+      // takes effect from the NEXT tick. That ordering is what makes autoscaler
+      // lag real rather than an artefact of where the call sits.
+      if (station.controllers.length > 0) {
+        const cap = capacityRps(station);
+        const util = Number.isFinite(cap) && cap > 0 ? arrivalTotal / cap : 0;
+        const next = applyControllers(station, {
+          utilization: util, simTimeSec: tSec, dtSeconds: dt,
+        });
+        station.servers = next.servers;
+        station.utilizationEwma = next.utilizationEwma;
+        station.observedSec = next.observedSec;
+        station.pendingServers = next.pendingServers;
+        station.pendingReadyAtSec = next.pendingReadyAtSec;
+        station.lastScaleAtSec = next.lastScaleAtSec;
+      }
+
       if (graded) {
         // Offered is counted at entries and completed at terminals, so a
         // multi-hop route is not counted once per hop. Losses are genuinely
@@ -229,10 +250,14 @@ export function simulate(input: SimInput): RunResult {
           });
           forwarded[c] = r.missRps;
           if (graded) {
+            // Every tier's hits count toward offload; only the first tier's
+            // count toward the latency number, and only the first tier sees the
+            // whole request population.
             hitAcc += r.hitRps * dt;
-            missAcc += r.missRps * dt;
-            edgeHitAcc += r.hitRps * dt;
-            edgeArrivalAcc += rate * dt;
+            if (isFirstTierCache.has(id)) {
+              edgeHitAcc += r.hitRps * dt;
+              edgeArrivalAcc += rate * dt;
+            }
             edgeEgressBytes += r.hitRps * dt * cls.responseBytes;
           }
         }
@@ -330,7 +355,7 @@ export function simulate(input: SimInput): RunResult {
         p95Ms: lastP95,
         p99Ms: lastP99,
         cacheHitRatioEdge: edgeArrivalAcc > 0 ? edgeHitAcc / edgeArrivalAcc : 0,
-        cacheHitRatioTotal: hitAcc + missAcc > 0 ? hitAcc / (hitAcc + missAcc) : 0,
+        cacheHitRatioTotal: edgeArrivalAcc > 0 ? hitAcc / edgeArrivalAcc : 0,
       });
     }
   }
@@ -381,7 +406,7 @@ export function simulate(input: SimInput): RunResult {
     perRegion,
     perNode,
     cacheHitRatioEdge: edgeArrivalAcc > 0 ? edgeHitAcc / edgeArrivalAcc : 0,
-    cacheHitRatioTotal: hitAcc + missAcc > 0 ? hitAcc / (hitAcc + missAcc) : 0,
+    cacheHitRatioTotal: edgeArrivalAcc > 0 ? hitAcc / edgeArrivalAcc : 0,
     attribution: heaviestWaterfall,
     frames,
     cost,

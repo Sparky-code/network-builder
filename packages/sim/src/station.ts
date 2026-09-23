@@ -31,12 +31,23 @@ export type RoutingSpec =
 /**
  * Controllers mutate station state between ticks.
  *
- * The union is empty in Phase 1 by design: Act I needs no controllers, and the
- * HPA spike in Phase 2 is what proves this seam absorbs autoscaling before any
- * content depends on it. The *field* exists now because commitment #1 says
- * `servers` is controller-driven state and retrofitting that is a rewrite.
+ * This is the seam that decides whether Acts V and VI are content or a second
+ * engine. An HPA is not a new kind of simulation - it is a function that adjusts
+ * `servers` with deliberate lag, which is exactly what commitment #1 reserved
+ * space for.
  */
-export type ControllerSpec = never;
+export type ControllerSpec = {
+  readonly kind: 'hpa';
+  readonly minServers: number;
+  readonly maxServers: number;
+  readonly targetUtilization: number;
+  /** Averaging window for the observed metric. Half of the response lag. */
+  readonly metricWindowSec: number;
+  /** Time for a new replica to become ready. The other half. */
+  readonly podStartSec: number;
+  /** Minimum interval between scaling decisions. What stops flapping. */
+  readonly cooldownSec: number;
+};
 
 export interface Station {
   readonly id: NodeId;
@@ -60,6 +71,16 @@ export interface Station {
   backlogReqs: number;
   health: 'healthy' | 'degraded' | 'down';
   warmth: number;
+
+  // --- controller state ---
+  /** Smoothed utilization. A controller reacts to this, never to one tick. */
+  utilizationEwma: number;
+  /** Seconds of metric observed. A controller may not act before it has data. */
+  observedSec: number;
+  /** Replica count decided but not yet in service. */
+  pendingServers: number;
+  pendingReadyAtSec: number;
+  lastScaleAtSec: number;
 }
 
 export interface SimEdge {
@@ -81,6 +102,7 @@ export function makeStation(init: {
   cryptoCpuMs?: number;
   admission?: readonly AdmissionSpec[];
   routing?: RoutingSpec;
+  controllers?: readonly ControllerSpec[];
 }): Station {
   return {
     id: init.id,
@@ -92,10 +114,97 @@ export function makeStation(init: {
     cryptoCpuMs: init.cryptoCpuMs ?? 0,
     admission: init.admission ?? [{ kind: 'none' }],
     routing: init.routing ?? { kind: 'terminal' },
-    controllers: [],
+    controllers: init.controllers ?? [],
     backlogReqs: 0,
     health: 'healthy',
     warmth: 1,
+    utilizationEwma: 0,
+    observedSec: 0,
+    pendingServers: 0,
+    pendingReadyAtSec: 0,
+    lastScaleAtSec: Number.NEGATIVE_INFINITY,
+  };
+}
+
+export interface ControllerContext {
+  /** This tick's observed utilization at the station. */
+  readonly utilization: number;
+  readonly simTimeSec: number;
+  readonly dtSeconds: number;
+}
+
+export interface ControllerResult {
+  readonly servers: number;
+  readonly utilizationEwma: number;
+  readonly observedSec: number;
+  readonly pendingServers: number;
+  readonly pendingReadyAtSec: number;
+  readonly lastScaleAtSec: number;
+}
+
+/**
+ * Advance a station's controllers by one tick.
+ *
+ * Pure: reads the station and context, returns the new values. The engine
+ * assigns them, so nothing here reads its own writes.
+ *
+ * The lesson this encodes is that autoscaling is not free. Response lag is
+ * `metricWindowSec + podStartSec` and the player feels it as a window of
+ * errors during a spike - which is why headroom, not a faster HPA, is usually
+ * the right answer.
+ */
+export function applyControllers(s: Station, ctx: ControllerContext): ControllerResult {
+  let servers = s.servers;
+  let utilizationEwma = s.utilizationEwma;
+  let observedSec = s.observedSec;
+  let pendingServers = s.pendingServers;
+  let pendingReadyAtSec = s.pendingReadyAtSec;
+  let lastScaleAtSec = s.lastScaleAtSec;
+
+  for (const c of s.controllers) {
+    if (c.kind !== 'hpa') continue;
+
+    const observed = Number.isFinite(ctx.utilization) ? ctx.utilization : 0;
+
+    if (observedSec <= 0) {
+      // Seed from the first observation rather than blending up from zero.
+      // Starting at zero means the controller's first act is to conclude there
+      // is no load and scale straight to the floor - which it did, shedding
+      // capacity on tick one before it had measured anything.
+      utilizationEwma = observed;
+    } else {
+      // Exponential moving average over the metric window. A controller that
+      // reacted to a single tick would oscillate violently.
+      const alpha = ctx.dtSeconds / Math.max(ctx.dtSeconds, c.metricWindowSec);
+      utilizationEwma += alpha * (observed - utilizationEwma);
+    }
+    observedSec += ctx.dtSeconds;
+
+    // A scheduled change becomes real only once the replicas are ready.
+    if (pendingServers > 0 && ctx.simTimeSec >= pendingReadyAtSec) {
+      servers = pendingServers;
+      pendingServers = 0;
+    }
+
+    if (pendingServers > 0) continue;
+    // No decision before a full metric window has been observed. This is half
+    // of the response lag the player is meant to feel.
+    if (observedSec < c.metricWindowSec) continue;
+    if (ctx.simTimeSec - lastScaleAtSec < c.cooldownSec) continue;
+
+    const desiredRaw = Math.ceil((servers * utilizationEwma) / c.targetUtilization);
+    const desired = Math.max(c.minServers, Math.min(c.maxServers, desiredRaw));
+    if (desired === servers) continue;
+
+    pendingServers = desired;
+    // Scaling up waits for pods to start; scaling down is immediate, because
+    // removing capacity needs nothing to boot.
+    pendingReadyAtSec = ctx.simTimeSec + (desired > servers ? c.podStartSec : 0);
+    lastScaleAtSec = ctx.simTimeSec;
+  }
+
+  return {
+    servers, utilizationEwma, observedSec, pendingServers, pendingReadyAtSec, lastScaleAtSec,
   };
 }
 

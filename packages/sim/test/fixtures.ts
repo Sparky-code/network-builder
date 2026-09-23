@@ -126,6 +126,37 @@ export function singleOrigin(opts: {
   };
 }
 
+/** An origin that scales itself. Act V level 29; proved out in Phase 2. */
+export function autoscaledOrigin(opts: {
+  region?: Region;
+  servers?: number;
+  minServers?: number;
+  maxServers?: number;
+  targetUtilization?: number;
+  metricWindowSec?: number;
+  podStartSec?: number;
+  cooldownSec?: number;
+} = {}): Station {
+  return makeStation({
+    id: nodeId('origin'),
+    regionId: (opts.region ?? SF).id,
+    servers: opts.servers ?? 4,
+    serviceMeanMs: 20,
+    serviceCv2: 0.5,
+    queueLimit: 4000,
+    routing: { kind: 'terminal' },
+    controllers: [{
+      kind: 'hpa',
+      minServers: opts.minServers ?? 2,
+      maxServers: opts.maxServers ?? 64,
+      targetUtilization: opts.targetUtilization ?? 0.7,
+      metricWindowSec: opts.metricWindowSec ?? 15,
+      podStartSec: opts.podStartSec ?? 20,
+      cooldownSec: opts.cooldownSec ?? 10,
+    }],
+  });
+}
+
 /** Level 4 shape: a client fanning out across n origins behind weighted routing. */
 export function horizontal(n: number, serversEach: number, region = SF): {
   stations: Station[]; edges: SimEdge[];

@@ -15,6 +15,22 @@ import { join } from 'node:path';
 const ROOT = join(import.meta.dirname, '..');
 
 /**
+ * Strip comments and string literals before scanning for forbidden constructs.
+ *
+ * Without this the checks match their own documentation: a comment reading
+ * "averaging window for the metric" trips the DOM-global check on `window.`,
+ * and a comment explaining why `Math.random()` is banned trips the determinism
+ * check. Prose about a rule is not a violation of it.
+ */
+function codeOnly(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1 ')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``');
+}
+
+/**
  * Layer order. A package may depend on any layer STRICTLY BELOW it, never on its
  * own layer and never upward.
  *
@@ -129,6 +145,29 @@ describe('workspace layering', () => {
   });
 });
 
+describe('the lockfile', () => {
+  /**
+   * CI installs with `npm ci`, which refuses a lockfile that disagrees with the
+   * manifests rather than quietly resolving something else. That is the right
+   * behaviour, but it turns "forgot to run npm install after adding a package"
+   * into a red build several minutes after the push.
+   *
+   * This check moves that failure to the local test run, where it costs
+   * seconds. It has already been earned once: `@nb/catalog` was added without
+   * regenerating the lockfile.
+   */
+  it('contains every workspace package', () => {
+    const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8')) as {
+      packages?: Record<string, unknown>;
+    };
+    const entries = Object.keys(lock.packages ?? {});
+    const missing = PACKAGES.filter((p) => !entries.includes(p.dir.replace(/\\/g, '/')));
+    expect(
+      missing.map((m) => `${m.name} (${m.dir}) is not in package-lock.json — run npm install`),
+    ).toEqual([]);
+  });
+});
+
 describe('the engine is headless', () => {
   const sim = PACKAGES.find((p) => p.name === '@nb/sim');
 
@@ -164,16 +203,15 @@ describe('the engine is headless', () => {
     const offenders: string[] = [];
     for (const f of files) {
       const text = readFileSync(f, 'utf8');
-      // Import specifiers only: a comment mentioning the DOM is fine, importing
-      // it is not.
+      const rel = f.replace(ROOT + '/', '');
+      // Import specifiers are read from the raw text, before string literals
+      // are blanked out.
       for (const m of text.matchAll(/from\s+'([^']+)'/g)) {
         const spec = m[1] ?? '';
-        if (/^(react|react-dom|@xyflow)/.test(spec)) {
-          offenders.push(`${f.replace(ROOT + '/', '')} imports ${spec}`);
-        }
+        if (/^(react|react-dom|@xyflow)/.test(spec)) offenders.push(`${rel} imports ${spec}`);
       }
-      if (/\b(document|window|navigator)\s*\./.test(text)) {
-        offenders.push(`${f.replace(ROOT + '/', '')} touches a DOM global`);
+      if (/\b(document|window|navigator)\s*\.\s*[A-Za-z_$]/.test(codeOnly(text))) {
+        offenders.push(`${rel} touches a DOM global`);
       }
     }
     expect(offenders).toEqual([]);
@@ -190,7 +228,7 @@ describe('the engine is headless', () => {
         const p = join(dir, e.name);
         if (e.isDirectory()) { walk(p); continue; }
         if (!e.name.endsWith('.ts')) continue;
-        const text = readFileSync(p, 'utf8');
+        const text = codeOnly(readFileSync(p, 'utf8'));
         const rel = p.replace(ROOT + '/', '');
         if (/Math\.random\s*\(/.test(text)) offenders.push(`${rel}: Math.random()`);
         if (/\bnew Date\b|\bDate\.now\s*\(/.test(text)) offenders.push(`${rel}: Date`);
