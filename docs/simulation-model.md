@@ -65,11 +65,25 @@ The cost is that we must be comfortable with queueing approximations, which is r
 150 lines of well-known mathematics and far cheaper than making a discrete-event
 simulation both fast and stable.
 
-**Where this is knowingly wrong:** fluid/mean-field descriptions degrade at low arrival
-rates. At ~5 rps the smooth flow abstraction does not match what a player would intuit
-from watching individual requests arrive. Mitigation: author level traffic at a few
-hundred rps and above, and use the DES oracle (§8) to measure where the approximation
-starts to drift rather than assuming a boundary.
+**Where this is knowingly wrong.** Two limitations, both measured against the
+discrete-event oracle rather than guessed at:
+
+1. **Low arrival rates.** Fluid/mean-field descriptions degrade when individual arrivals
+   matter. At ~5 rps the smooth abstraction drifts about 15% from the oracle. Mitigation:
+   author level traffic at a few hundred rps and above.
+2. **Multi-hop routes are optimistic by 4–13%.** Kernels are composed as independent, but
+   a real tandem queue correlates them: a busy period at one station delivers a burst into
+   the next, so actual queueing is worse than independent composition predicts. Measured
+   across three tandem configurations, the engine is *consistently* low — never high.
+
+The second is recorded rather than corrected. A correction factor tuned to a handful of
+oracle cases would be overfitting, and because the bias is consistent in direction and
+magnitude, relative comparisons — which is what every level actually teaches — remain
+correct. The test suite pins it two-sided, so if it ever flips sign or exceeds 20% that
+shows up as a failure rather than as quietly worse numbers.
+
+Single-station agreement is within 5% across every configuration tested, including
+high-variance M/G/c.
 
 ### Packets on screen are a projection, not the simulation
 
@@ -316,9 +330,15 @@ split(p):    Cd²ₚ = p·Cd² + (1 − p)
 ```
 
 `Cs²` is an authored per-component constant and an excellent teaching lever. A database at
-60% utilization with Cs²=4.0 queues worse than an app server at 85% with Cs²=0.5. Players
-discover that utilization alone does not predict latency — variance does too — which is
-not a lesson most people get before they hit it in production.
+60% utilization with Cs²=4.0 has a 75ms mean wait; an app server at 80% with Cs²=0.5 has
+60ms. The higher-utilization station is the healthier one. Players discover that
+utilization alone does not predict latency — variance does too — which is not a lesson most
+people get before they hit it in production.
+
+The crossover is worth stating precisely, because an earlier draft of this document got it
+wrong and the test suite caught it: at ρ=0.85 the low-variance station is back to being
+worse (85ms vs the database's 75ms). Variance dominates over a *range* of utilizations, not
+unconditionally, and level 9 is authored inside that range deliberately.
 
 ---
 

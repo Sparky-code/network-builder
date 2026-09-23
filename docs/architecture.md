@@ -28,15 +28,41 @@ network-builder/
     └── game/                    # Vite + React 19
 ```
 
-### The dependency chain is strictly linear
+### The dependency graph is layered and downward-only
 
 ```
-@nb/schema  ←  @nb/sim  ←  @nb/catalog  ←  @nb/content  ←  apps/game
+@nb/schema  ←  @nb/sim  ←  @nb/catalog  ←  @nb/content  ←  @nb/game
 ```
 
-Enforced by a test that reads each `package.json` and fails on any edge that is not in
-this list. Without enforcement the natural drift is `sim ↔ catalog ↔ content`, and the
-cycle is very hard to unpick once content has been written against it.
+Enforced by `test/architecture.test.ts`, which reads every workspace `package.json` and
+fails on any internal dependency that points **upward** or **sideways**, on any cycle, and
+on any package whose name is not assigned a layer. That last one matters: adding a package
+is a decision about where it sits, and the test makes someone make it rather than
+defaulting.
+
+A package may depend on any layer strictly below it, not only its immediate predecessor.
+This is layered rather than a single chain because `@nb/catalog` legitimately needs schema
+types directly, and routing that through `@nb/sim` would manufacture coupling to satisfy a
+rule instead of serving its purpose. What the rule exists to prevent is cycles and upward
+edges — the natural drift is `sim ↔ catalog ↔ content`, which is very hard to unpick once
+content has been authored against it — and those are exactly what it forbids.
+
+The app's package must be named `@nb/game` to satisfy the layer check.
+
+The same test file enforces two further documented claims, because both are cheap to break
+by accident:
+
+- **`@nb/sim` is headless.** No UI or DOM package may appear in its dependencies, no
+  source file may import `react` or `@xyflow/*`, and none may touch `document`, `window` or
+  `navigator`. The contract is that the engine runs in Node, in a test, and in a Web Worker
+  unchanged, so every number the game shows is reproducible from a command line.
+- **`@nb/sim` has no ambient randomness or wall clock.** No `Math.random()`, `Date.now()`,
+  `new Date`, `performance.now()` or `crypto.*` in engine source. Every draw is a pure
+  function of `(seed, purpose, tick, index)`; a stray `Math.random()` added for a visual
+  flourish would silently shift every graded number downstream of it.
+
+Each of these guards was verified by deliberately introducing the violation it describes
+and confirming the suite fails.
 
 `@nb/schema` exists solely to make that chain acyclic. It is about 200 lines of shared
 types and zod schemas with no logic, and it is the cheapest possible way to let `sim` and

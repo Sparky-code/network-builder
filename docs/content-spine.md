@@ -34,29 +34,48 @@ are allowed to change one.
 
 ### 2. The Speed of Light Is a Budget
 - **Concept** — distance is a cost you cannot buy your way out of.
-- **Mechanic** — the same topology, but the client moves to another continent. Nothing
-  else changes and latency roughly quadruples. Upgrading the server does nothing, which
-  is the point.
-- **Target** — p99 < 400ms for a transatlantic user. Passable, but uncomfortable.
+- **Mechanic** — the same topology, but the origin moves to another continent. Nothing
+  else changes and p50 goes from ~39ms to ~453ms. Upgrading the server changes *nothing*,
+  which is the point.
+- **Target** — p99 < 600ms for a transatlantic user. Passable, but uncomfortable.
 - **Deep dive** — great-circle distance, refractive index of fiber, path detour factor.
-- **CI claim** — `a bigger origin does not improve p99 for a distant client`.
+- **CI claims** — `SF-London RTT is ~139ms`; `a bigger origin does not improve p99 for a
+  distant client`; `crossing an ocean multiplies p50 by 8-15x`.
+- **Measured** — the multiple is ~11×, not the "quadruple" an earlier draft of this
+  document asserted. On a cold connection every handshake round trip becomes transatlantic
+  too, so setup alone costs 278ms of the 453ms. That is a better lesson than quadrupling,
+  and it sets up level 8 directly.
 
 ### 3. One Server, Too Many Users
 - **Concept** — queueing delay explodes long before capacity runs out.
-- **Mechanic** — a traffic slider. The player raises rps and watches p99 curve upward
-  while the origin still reports spare capacity. Meeting ρ and the hockey stick.
-- **Target** — p99 < 200ms at 800 rps.
-- **Deep dive** — utilization ρ, Erlang C, Little's law, the `1/(1−ρ)` term.
-- **CI claim** — `p99 at ρ=0.85 is more than 3× p99 at ρ=0.50`.
+- **Mechanic** — a traffic slider against a **single-server** origin (50 rps of capacity).
+  The player raises rps and watches p99 curve upward while the server still reports spare
+  capacity: 115ms at ρ=0.24, 169ms at ρ=0.5, 247ms at ρ=0.7, 452ms at ρ=0.84, 1182ms at
+  ρ=0.94, and 14.0s at ρ=1.0.
+- **Target** — p99 < 300ms, which forces the player to stay below ~75% utilization.
+- **Deep dive** — utilization ρ, Erlang C, Little's law, the `1/(1−ρ)` term, pooling.
+- **CI claims** — `p99 rises monotonically with ρ`; `p99 at ρ=0.94 is more than 5× p99 at
+  ρ=0.50`; `at ρ=0.94 the queue exceeds every other contribution combined`; `a station at
+  exactly ρ=1.0 is already failing`.
+- **Measured** — the ratio claim has to name a single-server origin and ρ=0.94. An earlier
+  draft claimed 3× at ρ=0.85, which is false two ways: end-to-end p99 is diluted by fixed
+  costs (the *queue* term triples, the total does not), and with 8 pooled servers ρ=0.85 is
+  barely uncomfortable at all. Pooling is why, and level 4 is about to exploit it.
 
 ### 4. Vertical vs Horizontal
 - **Concept** — two ways to add capacity, with different cost curves and different failure
   behaviour.
-- **Mechanic** — one bigger box or three smaller ones, at comparable cost. Both pass the
-  SLO; only one survives losing a node, which foreshadows Act II.
-- **Target** — p99 < 200ms at 2,000 rps, under $900/mo.
-- **Deep dive** — scale-up vs scale-out, single point of failure, N+1.
-- **CI claim** — `the three-node solution keeps serving when one node is removed; the single large node does not`.
+- **Mechanic** — nine service slots as one box or as three, at identical cost. The vertical
+  option is *faster* (one queue of nine pools better than three queues of three), and the
+  horizontal one survives a node loss. The player has to choose what they are buying.
+- **Target** — p99 < 200ms at 300 rps, under $900/mo, surviving one node loss.
+- **Deep dive** — scale-up vs scale-out, pooling, single point of failure, N+1.
+- **CI claims** — `nine slots cost the same either way`; `the single pool has lower p99`;
+  `killing the single box gives 100% errors while killing one of three gives ~33%`.
+- **Measured** — 33%, not 0%. Without health checks the client keeps routing a third of
+  traffic into a dead backend, so horizontal scaling alone is necessary but not sufficient.
+  That residual is precisely what level 6 closes, which is a better bridge into Act II than
+  the original claim of outright survival.
 
 ---
 
@@ -108,7 +127,9 @@ Five levels plus the first chaos event. One site, made properly resilient.
 - **Target** — p99 < 200ms at 6,000 rps.
 - **Deep dive** — coefficient of variation, connection pool sizing, read replicas,
   replication lag.
-- **CI claim** — `a Cv²=4.0 station at ρ=0.6 has higher p99 than a Cv²=0.5 station at ρ=0.85`.
+- **CI claim** — `a Cv²=4.0 station at ρ=0.6 queues worse than a Cv²=0.5 station at ρ=0.80`
+  (75ms vs 60ms mean wait). Note the crossover is real but not unlimited: at ρ=0.85 the
+  low-variance station is worse again, at 85ms.
 
 ### ⚡ Chaos 1 — Peak Day
 10× traffic against the site the player built in levels 5–9. Whatever they skimped on
