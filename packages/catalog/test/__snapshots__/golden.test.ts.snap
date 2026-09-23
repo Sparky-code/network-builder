@@ -1,0 +1,195 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden reference topologies > act1-distant-origin matches its snapshot > act1-distant-origin 1`] = `
+{
+  "cacheHitRatioEdge": 0,
+  "cacheHitRatioTotal": 0,
+  "costUsdMonth": 3228.27,
+  "perClass": {
+    "static-asset": {
+      "errorRatePct": 0,
+      "p50Ms": 203.6,
+      "p95Ms": 233.5,
+      "p99Ms": 258.8,
+      "throughputRps": 200,
+    },
+  },
+  "perNode": {
+    "client": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "origin": {
+      "dropRatePct": 0,
+      "utilization": 0.5,
+    },
+  },
+}
+`;
+
+exports[`golden reference topologies > act1-single-origin matches its snapshot > act1-single-origin 1`] = `
+{
+  "cacheHitRatioEdge": 0,
+  "cacheHitRatioTotal": 0,
+  "costUsdMonth": 3228.27,
+  "perClass": {
+    "static-asset": {
+      "errorRatePct": 0,
+      "p50Ms": 38.1,
+      "p95Ms": 68.1,
+      "p99Ms": 93.4,
+      "throughputRps": 200,
+    },
+  },
+  "perNode": {
+    "client": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "origin": {
+      "dropRatePct": 0,
+      "utilization": 0.5,
+    },
+  },
+}
+`;
+
+exports[`golden reference topologies > act2-database-bottleneck matches its snapshot > act2-database-bottleneck 1`] = `
+{
+  "cacheHitRatioEdge": 0,
+  "cacheHitRatioTotal": 0,
+  "costUsdMonth": 7416.55,
+  "perClass": {
+    "static-asset": {
+      "errorRatePct": 0,
+      "p50Ms": 38,
+      "p95Ms": 68.1,
+      "p99Ms": 93.4,
+      "throughputRps": 400,
+    },
+  },
+  "perNode": {
+    "client": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "db": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "origin": {
+      "dropRatePct": 0,
+      "utilization": 0.25,
+    },
+  },
+}
+`;
+
+exports[`golden reference topologies > act2-load-balanced matches its snapshot > act2-load-balanced 1`] = `
+{
+  "cacheHitRatioEdge": 0,
+  "cacheHitRatioTotal": 0,
+  "costUsdMonth": 9684.82,
+  "perClass": {
+    "static-asset": {
+      "errorRatePct": 0,
+      "p50Ms": 40.3,
+      "p95Ms": 70.6,
+      "p99Ms": 96.6,
+      "throughputRps": 600,
+    },
+  },
+  "perNode": {
+    "client": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "lb": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "origin-a": {
+      "dropRatePct": 0,
+      "utilization": 0.5,
+    },
+    "origin-b": {
+      "dropRatePct": 0,
+      "utilization": 0.5,
+    },
+    "origin-c": {
+      "dropRatePct": 0,
+      "utilization": 0.5,
+    },
+  },
+}
+`;
+
+exports[`golden reference topologies > act3-edge-cache matches its snapshot > act3-edge-cache 1`] = `
+{
+  "cacheHitRatioEdge": 0.892,
+  "cacheHitRatioTotal": 0.892,
+  "costUsdMonth": 10830.77,
+  "perClass": {
+    "static-asset": {
+      "errorRatePct": 0,
+      "p50Ms": 25.2,
+      "p95Ms": 227.5,
+      "p99Ms": 250.7,
+      "throughputRps": 2000,
+    },
+  },
+  "perNode": {
+    "client": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "origin": {
+      "dropRatePct": 0,
+      "utilization": 0.54,
+    },
+    "pop": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+  },
+}
+`;
+
+exports[`golden reference topologies > act3-shielded-multi-pop matches its snapshot > act3-shielded-multi-pop 1`] = `
+{
+  "cacheHitRatioEdge": 0.892,
+  "cacheHitRatioTotal": 0.981,
+  "costUsdMonth": 18306.74,
+  "perClass": {
+    "static-asset": {
+      "errorRatePct": 0,
+      "p50Ms": 194.5,
+      "p95Ms": 546.3,
+      "p99Ms": 567.2,
+      "throughputRps": 4000,
+    },
+  },
+  "perNode": {
+    "client": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "origin": {
+      "dropRatePct": 0,
+      "utilization": 0.049,
+    },
+    "pop-a": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "pop-b": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+    "shield": {
+      "dropRatePct": 0,
+      "utilization": 0,
+    },
+  },
+}
+`;

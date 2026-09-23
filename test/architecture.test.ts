@@ -15,6 +15,22 @@ import { join } from 'node:path';
 const ROOT = join(import.meta.dirname, '..');
 
 /**
+ * Strip comments and string literals before scanning for forbidden constructs.
+ *
+ * Without this the checks match their own documentation: a comment reading
+ * "averaging window for the metric" trips the DOM-global check on `window.`,
+ * and a comment explaining why `Math.random()` is banned trips the determinism
+ * check. Prose about a rule is not a violation of it.
+ */
+function codeOnly(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1 ')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``');
+}
+
+/**
  * Layer order. A package may depend on any layer STRICTLY BELOW it, never on its
  * own layer and never upward.
  *
@@ -164,16 +180,15 @@ describe('the engine is headless', () => {
     const offenders: string[] = [];
     for (const f of files) {
       const text = readFileSync(f, 'utf8');
-      // Import specifiers only: a comment mentioning the DOM is fine, importing
-      // it is not.
+      const rel = f.replace(ROOT + '/', '');
+      // Import specifiers are read from the raw text, before string literals
+      // are blanked out.
       for (const m of text.matchAll(/from\s+'([^']+)'/g)) {
         const spec = m[1] ?? '';
-        if (/^(react|react-dom|@xyflow)/.test(spec)) {
-          offenders.push(`${f.replace(ROOT + '/', '')} imports ${spec}`);
-        }
+        if (/^(react|react-dom|@xyflow)/.test(spec)) offenders.push(`${rel} imports ${spec}`);
       }
-      if (/\b(document|window|navigator)\s*\./.test(text)) {
-        offenders.push(`${f.replace(ROOT + '/', '')} touches a DOM global`);
+      if (/\b(document|window|navigator)\s*\.\s*[A-Za-z_$]/.test(codeOnly(text))) {
+        offenders.push(`${rel} touches a DOM global`);
       }
     }
     expect(offenders).toEqual([]);
@@ -190,7 +205,7 @@ describe('the engine is headless', () => {
         const p = join(dir, e.name);
         if (e.isDirectory()) { walk(p); continue; }
         if (!e.name.endsWith('.ts')) continue;
-        const text = readFileSync(p, 'utf8');
+        const text = codeOnly(readFileSync(p, 'utf8'));
         const rel = p.replace(ROOT + '/', '');
         if (/Math\.random\s*\(/.test(text)) offenders.push(`${rel}: Math.random()`);
         if (/\bnew Date\b|\bDate\.now\s*\(/.test(text)) offenders.push(`${rel}: Date`);
