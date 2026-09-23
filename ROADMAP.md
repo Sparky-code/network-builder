@@ -72,10 +72,10 @@ Sequenced so the riskiest thing is proven first.
 
 | Phase | Outcome | Gate before proceeding |
 | --- | --- | --- |
-| **0 — Design** ← *we are here* | Roadmap, simulation model, content spine, architecture, ADRs | Design reviewed and agreed |
-| **1 — Engine core** | `@nb/schema` + `@nb/sim`: station, tick loop, Erlang/Allen–Cunneen, latency kernels, route probes. Headless, with analytic and DES oracle tests. **No UI at all** | Act I numbers are defensible and deterministic |
-| **2 — Catalog + determinism harness** | Six component types with ports and costs; shuffle, conservation, monotonicity and golden-snapshot tests. Plus the throwaway HPA spike (below) | Shuffled-input runs are bit-identical |
-| **3 — Vertical slice** | `apps/game`: React Flow editor, validation, canvas packet overlay, one hardcoded level | The loop is *fun*, not merely correct |
+| **0 — Design** | Roadmap, simulation model, content spine, architecture, ADRs | Design reviewed and agreed |
+| **1 — Engine core** ✅ | `@nb/schema` + `@nb/sim`: station, tick loop, Erlang/Allen–Cunneen, latency kernels, route probes. Headless, with analytic and DES oracle tests. **No UI at all** | Act I numbers are defensible and deterministic |
+| **2 — Catalog + determinism harness** ✅ | Six component types with ports and costs; shuffle, conservation, monotonicity and golden-snapshot tests. Plus the throwaway HPA spike (below) | Shuffled-input runs are bit-identical |
+| **3 — Vertical slice** ← *next* | `apps/game`: React Flow editor, validation, canvas packet overlay, one hardcoded level | The loop is *fun*, not merely correct |
 | **4 — Content harness + Act I** | `defineLevel`, zod validation, the `explains`/`demonstrations` CI checks, levels 1–4 | A lesson cannot silently become false |
 | **5 — Grading + attribution** | Latency attribution waterfall, run-to-run diff, star grading | "Why did p99 move?" is answerable at a glance |
 | **6 — Act II + Chaos 1** | First chaos set-piece, on the player's own topology | Chaos reads as consequence, not a new game |
@@ -93,11 +93,19 @@ Putting it first surfaces that in week one rather than month three. The engine i
 therefore built and tested with zero rendering — the first thing that exists is a function
 you can call from a test and argue with.
 
-**The HPA spike is pulled forward into Phase 2** rather than waiting for Act V. It costs
-about a day: one `Controller` that mutates a station's concurrency with lag, proving the
-core abstraction absorbs autoscaling. Then it gets shelved until Act V. This is the
+**The HPA spike was pulled forward into Phase 2** rather than waiting for Act V, as the
 cheapest available insurance against discovering in month four that Kubernetes needs a
-different engine — the failure mode that would cost the most and be found the latest.
+different engine.
+
+**Result: the abstraction held.** An HPA turned out to be a function that adjusts `servers`
+with lag. It needed one seam — `applyControllers`, called at the end of a station's tick —
+and no new simulation primitive. Measured response lag is exactly `metricWindowSec +
+podStartSec`, which is the quantity level 29 is built on. It also reproduced the lesson
+that matters: against an 800 rps spike, a tightly tuned autoscaler starting at 6 replicas
+gives 61% errors and a 49-second p99, while a floor of 24 replicas gives 0% and 95ms. No
+amount of tuning conjures capacity that does not yet exist.
+
+Because it works, it is kept rather than thrown away — it is Act V level 29, arriving early.
 
 ---
 

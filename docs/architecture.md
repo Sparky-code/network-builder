@@ -148,16 +148,27 @@ interface Port {
   direction: 'in' | 'out';
   protocol: 'http' | 'grpc' | 'sql' | 'dns' | 'tcp';
   provides?: CapabilityTag[];   // e.g. ['authenticated', 'tls-terminated']
-  accepts?: CapabilityTag[];    // must be a superset of the upstream's `provides`
+  accepts?: CapabilityTag[];    // what this port REQUIRES of its upstream
   minDegree: number;
   maxDegree: number;
 }
 ```
 
-An edge is legal iff the protocols match, `to.accepts ⊇ from.provides`, and degree bounds
+An edge is legal iff the protocols match, `from.provides ⊇ to.accepts`, and degree bounds
 hold. A cache cannot connect to a database because the cache's out-port speaks `http` and
 the database's in-port speaks `sql`. That rule was never written down — it emerges, and it
 comes with an explanation the UI can show the player.
+
+The direction matters, and an earlier draft had it backwards. `accepts` is a *requirement*,
+so the upstream must supply everything the downstream demands: an origin requiring
+`inspected` traffic can only be fed by something that provides it. Reading it the other way
+round — the target must tolerate everything the source offers — is coherent but useless,
+since it would forbid connecting an authenticated source to a port that simply never
+mentioned authentication.
+
+Capabilities are checked on the immediate edge only. Path-level requirements such as "every
+ingress route traverses a WAF" are graph rules, which is why the rule registry exists
+alongside the port system rather than instead of it.
 
 Capability tags are what let Act VI work without new machinery: a component can require
 `tls-terminated` or `authenticated` on its inbound port, and the validator enforces it the
