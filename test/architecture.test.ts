@@ -145,6 +145,29 @@ describe('workspace layering', () => {
   });
 });
 
+describe('the lockfile', () => {
+  /**
+   * CI installs with `npm ci`, which refuses a lockfile that disagrees with the
+   * manifests rather than quietly resolving something else. That is the right
+   * behaviour, but it turns "forgot to run npm install after adding a package"
+   * into a red build several minutes after the push.
+   *
+   * This check moves that failure to the local test run, where it costs
+   * seconds. It has already been earned once: `@nb/catalog` was added without
+   * regenerating the lockfile.
+   */
+  it('contains every workspace package', () => {
+    const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8')) as {
+      packages?: Record<string, unknown>;
+    };
+    const entries = Object.keys(lock.packages ?? {});
+    const missing = PACKAGES.filter((p) => !entries.includes(p.dir.replace(/\\/g, '/')));
+    expect(
+      missing.map((m) => `${m.name} (${m.dir}) is not in package-lock.json — run npm install`),
+    ).toEqual([]);
+  });
+});
+
 describe('the engine is headless', () => {
   const sim = PACKAGES.find((p) => p.name === '@nb/sim');
 
