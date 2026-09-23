@@ -170,28 +170,48 @@ describe('Level 4 — Vertical vs Horizontal', () => {
 
 describe('engine performance', () => {
   /**
-   * A guard, not a benchmark. The what-if loop is the pedagogy, so a run has to
-   * stay fast enough to re-run on every edit. This caught a quadratic pooling
-   * bug that made a 20-second scenario take 60 seconds of wall clock.
+   * These are order-of-magnitude guards, not benchmarks.
+   *
+   * The what-if loop is the pedagogy, so a run has to stay fast enough to re-run
+   * on every edit. This caught a quadratic pooling bug that made a 20-second
+   * scenario take 60 seconds - a miss of roughly four orders of magnitude.
+   *
+   * The absolute ceilings are therefore deliberately loose. A tight wall-clock
+   * assertion on a shared 2-core CI runner is flaky by construction, and a perf
+   * test that goes red for reasons nobody can act on trains people to ignore red
+   * builds, which costs more than having no guard at all. An earlier version
+   * asserted 500ms for the 17-node case; it passed locally at 181ms and failed CI
+   * at 556ms.
    */
-  it('simulates a 20-second scenario in well under 100ms', () => {
-    const topo = singleOrigin({ servers: 8 });
-    const input = { ...topo, scenario: scenario() };
-    simulate(input); // warm the Erlang cache and JIT
 
+  const measure = (input: Parameters<typeof simulate>[0]): number => {
+    simulate(input); // warm the Erlang cache and let the JIT settle
     const start = performance.now();
-    const runs = 5;
-    for (let i = 0; i < runs; i++) simulate(input);
-    const perRun = (performance.now() - start) / runs;
+    simulate(input);
+    return performance.now() - start;
+  };
 
-    expect(perRun).toBeLessThan(100);
+  it('simulates a 20-second scenario fast enough to re-run on every edit', () => {
+    const perRun = measure({ ...singleOrigin({ servers: 8 }), scenario: scenario() });
+    // ~11ms locally, ~30ms on a CI runner.
+    expect(perRun).toBeLessThan(500);
   });
 
-  it('scales acceptably with topology size', () => {
-    const input = { ...horizontal(16, 4), scenario: scenario() };
-    simulate(input);
-    const start = performance.now();
-    simulate(input);
-    expect(performance.now() - start).toBeLessThan(500);
+  it('handles a large topology without falling over', () => {
+    const perRun = measure({ ...horizontal(16, 4), scenario: scenario() });
+    // ~181ms locally, ~556ms on a CI runner.
+    expect(perRun).toBeLessThan(3000);
+  });
+
+  /**
+   * The machine-independent guard, and the one that actually protects against
+   * the bug that happened. Cost should grow roughly linearly with the graph;
+   * quadratic growth over this 3.4x jump in node count would be ~11x, so a
+   * ceiling of 8x catches it while absorbing runner noise.
+   */
+  it('scales roughly linearly with topology size, not quadratically', () => {
+    const small = measure({ ...horizontal(4, 4), scenario: scenario() });
+    const large = measure({ ...horizontal(16, 4), scenario: scenario() });
+    expect(large / small).toBeLessThan(8);
   });
 });
