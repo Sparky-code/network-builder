@@ -1,0 +1,22 @@
+{
+  "name": "network-builder",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "fast-check": "^4.10.2",
+    "oxlint": "^1.85.0",
+    "typescript": "^6.0.2",
+    "vitest": "^5.0.1"
+  }
+}
