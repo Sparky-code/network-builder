@@ -1,6 +1,6 @@
 import type {
   ClassMetrics, Demand, LatencyWaterfall, MetricsFrame, NodeId, Region, RegionId,
-  RunResult, TrafficClass,
+  RunResult, StationFrame, TrafficClass,
 } from '@nb/schema';
 import {
   buildGraph, edgeCost, enumerateRoutes, firstTierCaches,
@@ -156,6 +156,10 @@ export function simulate(input: SimInput): RunResult {
     let tickCompleted = 0;
     let tickDropped = 0;
     let tickRejected = 0;
+    // Per-station snapshot for this tick, keyed in graph.order (sorted ids) so
+    // frame output is deterministic. Only populated when graded - warmup ticks
+    // are discarded before a frame is ever built from them.
+    const stationsThisTick: Record<string, StationFrame> = {};
 
     for (const id of graph.order) {
       const station = graph.stations.get(id);
@@ -171,13 +175,30 @@ export function simulate(input: SimInput): RunResult {
       const accum = nodeAccum.get(id);
       if (accum !== undefined && graded) {
         const cap = capacityRps(station);
-        accum.utilizationSum += cap > 0 ? arrivalTotal / cap : 0;
+        const util = cap > 0 ? arrivalTotal / cap : 0;
+        accum.utilizationSum += util;
         accum.utilizationTicks += 1;
         accum.backlogPeak = Math.max(accum.backlogPeak, served.newBacklogReqs);
         accum.offeredReqs += arrivalTotal * dt;
         accum.droppedReqs += served.droppedReqs;
         accum.rejectedReqs += served.rejectedReqs;
         accum.completedReqs += served.completedReqs;
+      }
+
+      if (graded) {
+        // This tick's values, not the run aggregates above - the whole point of
+        // per-frame station data is to show the backlog integrator moving.
+        //
+        // Deliberately not nested inside the accumulator block: frame data and
+        // run aggregates are emitted for different reasons, and tying them to
+        // one condition means a later change to the aggregate guard would
+        // silently empty the frames.
+        const cap = capacityRps(station);
+        stationsThisTick[id] = {
+          backlogReqs: served.newBacklogReqs,
+          utilization: cap > 0 ? arrivalTotal / cap : 0,
+          droppedRps: dt > 0 ? served.droppedReqs / dt : 0,
+        };
       }
 
       // Kernel reflects the queue as it stands entering this tick.
@@ -356,6 +377,7 @@ export function simulate(input: SimInput): RunResult {
         p99Ms: lastP99,
         cacheHitRatioEdge: edgeArrivalAcc > 0 ? edgeHitAcc / edgeArrivalAcc : 0,
         cacheHitRatioTotal: edgeArrivalAcc > 0 ? hitAcc / edgeArrivalAcc : 0,
+        stations: stationsThisTick,
       });
     }
   }
