@@ -13,6 +13,14 @@ import type { ComponentType } from '@nb/catalog';
  * State is never carried by colour alone: an error also changes the border to
  * dashed and adds an icon, and saturation shows as a fill level as well as a
  * hue.
+ *
+ * The queue tank (`.station-queue`) is the backlog visual: an accumulating
+ * quantity, not the utilization percentage the thin bottom bar already shows.
+ * Its fill height, its peak marker and its live count are all written
+ * imperatively from PacketOverlay's rAF loop, never from React props - see
+ * that file for why. It only renders for component types that can actually
+ * queue (have a finite `queueLimitPerServer`); a load balancer or cache never
+ * accumulates a backlog, so it never gets a tank.
  */
 
 const ICONS: Record<string, typeof Server> = {
@@ -38,6 +46,7 @@ function StationNodeInner({ data, selected, id }: NodeProps) {
   const inPort = d.type.ports.find((p) => p.direction === 'in');
   const outPort = d.type.ports.find((p) => p.direction === 'out');
   const state = d.hasError ? 'error' : d.hasWarning ? 'warning' : 'ok';
+  const queues = d.type.simTemplate.queueLimitPerServer !== undefined;
 
   return (
     <div
@@ -60,8 +69,20 @@ function StationNodeInner({ data, selected, id }: NodeProps) {
         <div className="station-meta">
           {d.metric !== '' && <span className="station-metric">{d.metric}</span>}
           {d.detail !== '' && <span className="station-detail">{d.detail}</span>}
+          {/* Populated imperatively, per frame, from the real backlog count -
+              never from a React prop. Empty and collapsed until there is one. */}
+          {queues && <span className="station-queue-count" aria-hidden="true" />}
         </div>
       </div>
+
+      {queues && (
+        <div className="station-queue" aria-hidden="true">
+          {/* High-water mark: stays in place as the fill recedes below it,
+              so a player can still see how deep the queue got after it drains. */}
+          <div className="station-queue-peak" />
+          <div className="station-queue-fill" />
+        </div>
+      )}
 
       {state !== 'ok' && (
         <span

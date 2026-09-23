@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getBezierPath, Position, useStore, useStoreApi } from '@xyflow/react';
 import { rng } from '@nb/sim';
+import { CATALOG } from '@nb/catalog';
 import type { RunResult } from '@nb/schema';
 import type { Topology } from '@nb/schema';
 
@@ -84,6 +85,36 @@ function edgeShares(topology: Topology): Map<string, number> {
   return shares;
 }
 
+/**
+ * The backlog ceiling for a station, in requests - the same number the engine
+ * clamps `backlogReqs` against before it starts shedding (`station.ts`).
+ *
+ * Used to scale the queue-depth visual. Anchoring the scale to the station's
+ * real shedding threshold, rather than a made-up constant, means a full tank
+ * means something: it is the exact moment requests start getting rejected.
+ * Types with no `queueLimitPerServer` (client, load balancer, caches) never
+ * queue, so they have no ceiling and no tank is drawn for them.
+ */
+function queueLimitOf(topology: Topology): Map<string, number> {
+  const limits = new Map<string, number>();
+  for (const n of topology.nodes) {
+    const type = CATALOG.get(n.typeId);
+    const perServer = type?.simTemplate.queueLimitPerServer;
+    if (type === undefined || perServer === undefined) continue;
+    const templateServers = type.simTemplate.servers === 'infinite'
+      ? Number.POSITIVE_INFINITY
+      : type.simTemplate.servers;
+    const cfgServers = n.config['servers'];
+    const servers = typeof cfgServers === 'number' && Number.isFinite(cfgServers)
+      ? cfgServers
+      : templateServers;
+    if (Number.isFinite(servers) && servers > 0) {
+      limits.set(n.id as string, servers * perServer);
+    }
+  }
+  return limits;
+}
+
 export function PacketOverlay({ topology, positions, result, playhead }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const storeApi = useStoreApi();
@@ -94,6 +125,40 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
   const geometryRef = useRef<EdgeGeometry[]>([]);
   const runRef = useRef<{ result: RunResult | null; playhead: number }>({ result, playhead });
   runRef.current = { result, playhead };
+
+  // Queue capacity per station, in requests. Sampled on topology change, like
+  // edge geometry - it depends on component type and server count, not on
+  // anything that changes per frame.
+  const queueLimitsRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    queueLimitsRef.current = queueLimitOf(topology);
+  }, [topology]);
+
+  // Running high-water mark of backlog, per station, at every frame of the
+  // run - computed once per result rather than tracked live, so scrubbing the
+  // playhead backwards shows the correct peak-so-far instead of one left over
+  // from a forward play that never happened. This is the "persistent trace of
+  // the peak": once the fill recedes below it during drain, the gap between
+  // the two is a player-visible measure of how much recovery is still owed.
+  const peakSeriesRef = useRef<Map<string, Float32Array>>(new Map());
+  useEffect(() => {
+    const series = new Map<string, Float32Array>();
+    if (result !== null) {
+      const ids = new Set<string>();
+      for (const f of result.frames) for (const id of Object.keys(f.stations)) ids.add(id);
+      const running = new Map<string, number>();
+      for (const id of ids) series.set(id, new Float32Array(result.frames.length));
+      result.frames.forEach((f, i) => {
+        for (const id of ids) {
+          const cur = f.stations[id]?.backlogReqs ?? 0;
+          const next = Math.max(running.get(id) ?? 0, cur);
+          running.set(id, next);
+          series.get(id)![i] = next;
+        }
+      });
+    }
+    peakSeriesRef.current = series;
+  }, [result]);
 
   useEffect(() => {
     const geometry: EdgeGeometry[] = [];
@@ -180,7 +245,10 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
             edgeIdx[slot] = g;
             // Transit slows as the receiving station saturates, because the
             // utilization driving it is the simulation's, not a flourish.
-            const util = r?.perNode[geo.targetId]?.utilization ?? 0;
+            // Per-tick station data reflects this instant, not the run's
+            // average, so a packet visibly slows down as the spike lands.
+            const util = frameData.stations[geo.targetId]?.utilization
+              ?? r?.perNode[geo.targetId]?.utilization ?? 0;
             speed[slot] = 1 / (0.45 + Math.min(2.5, util) * 0.5);
             // Purpose-keyed, so nothing drawn here can perturb a graded number.
             // The 'viz' stream is independent of every stream the engine uses.
@@ -218,16 +286,57 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
       }
       ctx.globalAlpha = 1;
 
-      // Node-internal visuals bypass React entirely: the saturation bar is a
-      // CSS custom property written straight to the element. At 60fps this is
-      // the difference between a smooth canvas and a re-render storm.
+      // Node-internal visuals bypass React entirely: the saturation bar and
+      // the queue tank are CSS custom properties written straight to the
+      // element. At 60fps this is the difference between a smooth canvas and
+      // a re-render storm.
       if (r !== null) {
+        const limits = queueLimitsRef.current;
+        const peaks = peakSeriesRef.current;
         for (const el of document.querySelectorAll<HTMLElement>('[data-station]')) {
           const id = el.dataset['station'];
           if (id === undefined) continue;
-          const util = r.perNode[id]?.utilization ?? 0;
+          const st = frameData?.stations[id];
+
+          // Utilization: this tick's load against capacity, when the frame
+          // has it - the run-wide average otherwise (e.g. before a run).
+          const util = st?.utilization ?? r.perNode[id]?.utilization ?? 0;
           el.style.setProperty('--util', String(Math.min(1, util)));
           el.dataset['saturated'] = util >= 0.85 ? 'true' : 'false';
+
+          // Backlog: an accumulating quantity, not a ratio. The tank's fill
+          // fraction is scaled against the station's real shedding ceiling,
+          // so 100% is not an arbitrary cap - it is the instant the door
+          // starts turning requests away, and the plateau there is the
+          // saturate-and-shed phase, distinct from build and drain.
+          const backlog = st?.backlogReqs ?? 0;
+          const limit = limits.get(id) ?? Number.POSITIVE_INFINITY;
+          const backlogFrac = Number.isFinite(limit) && limit > 0
+            ? Math.min(1, backlog / limit) : 0;
+          const peakVal = peaks.get(id)?.[Math.max(0, ph)] ?? 0;
+          const peakFrac = Number.isFinite(limit) && limit > 0
+            ? Math.min(1, peakVal / limit) : 0;
+          el.style.setProperty('--backlog-frac', String(backlogFrac));
+          el.style.setProperty('--backlog-peak-frac', String(peakFrac));
+          el.dataset['queueState'] = (st?.droppedRps ?? 0) > 0
+            ? 'shedding' : backlog > 0 ? 'queued' : 'idle';
+
+          const countEl = el.querySelector<HTMLElement>('.station-queue-count');
+          if (countEl !== null) {
+            countEl.textContent = backlog >= 1 ? `${Math.round(backlog)} queued` : '';
+          }
+        }
+      } else {
+        // No run to draw: leave nothing stale from a previous one on a
+        // reused DOM node (React Flow keeps nodes with the same id mounted).
+        for (const el of document.querySelectorAll<HTMLElement>('[data-station]')) {
+          el.style.setProperty('--util', '0');
+          el.style.setProperty('--backlog-frac', '0');
+          el.style.setProperty('--backlog-peak-frac', '0');
+          el.dataset['saturated'] = 'false';
+          el.dataset['queueState'] = 'idle';
+          const countEl = el.querySelector<HTMLElement>('.station-queue-count');
+          if (countEl !== null) countEl.textContent = '';
         }
       }
     };
