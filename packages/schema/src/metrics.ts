@@ -38,6 +38,23 @@ export interface CostBreakdown {
   readonly totalUsdMonth: number;
 }
 
+/**
+ * Per-station state at one tick.
+ *
+ * The engine models backlog as an integrator — work accumulates when arrivals
+ * exceed capacity and drains at capacity afterwards, so breaking is fast and
+ * recovering is slow. That asymmetry is the most teachable behaviour the
+ * simulation has, and until now the presentation layer had no access to it:
+ * `NodeMetrics.backlogPeak` is a single number for the whole run, which cannot
+ * show a queue growing.
+ */
+export interface StationFrame {
+  /** Requests queued at this station, at this tick. Not a ratio — a quantity. */
+  readonly backlogReqs: number;
+  readonly utilization: number;
+  readonly droppedRps: number;
+}
+
 /** One emitted frame per simulated tick. */
 export interface MetricsFrame {
   readonly tick: number;
@@ -51,6 +68,15 @@ export interface MetricsFrame {
   readonly p99Ms: number;
   readonly cacheHitRatioEdge: number;
   readonly cacheHitRatioTotal: number;
+  /**
+   * Per-station state, keyed by node id.
+   *
+   * This is the only per-node time series the engine emits. Frame count is
+   * bounded by the graded window (a few hundred) and topologies are small by
+   * design, so a record per frame is cheap and far easier to consume than
+   * parallel typed arrays.
+   */
+  readonly stations: Readonly<Record<string, StationFrame>>;
 }
 
 export interface RunResult {
