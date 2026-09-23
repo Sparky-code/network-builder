@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A superseded run has nothing useful left to say. Cancel it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: this workflow only ever reads the repository.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: typecheck, lint, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` rather than `npm install`: fails on a lockfile that disagrees
+      # with package.json instead of quietly resolving something else.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The engine is headless by contract, so the whole suite runs here with no
+      # browser and no display. That includes the parts that matter most:
+      #
+      #   - the analytic oracle, against closed-form queueing theory
+      #   - the DES oracle, against a token-level simulation
+      #   - shuffled-input identity, which is what actually protects determinism
+      #   - the Act I reference numbers
+      #   - a performance guard, which once caught a quadratic pooling bug
+      #
+      # If this job passes, the numbers the game grades on are reproducible.
+      - name: Test
+        run: npm test
