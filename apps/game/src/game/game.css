@@ -293,6 +293,106 @@
 }
 .station[data-saturated="true"] .station-load-fill { background: var(--color-danger); }
 
+/*
+ * The queue tank: backlog as an accumulating quantity, not the percentage the
+ * thin bar above already shows. Height is scaled against the station's real
+ * shedding ceiling (computed in PacketOverlay.tsx from queueLimitPerServer),
+ * so a full tank is not an arbitrary visual cap - it is the exact fill level
+ * at which the door starts turning requests away.
+ *
+ * Only rendered for component types that can actually queue (StationNode.tsx
+ * gates it on `queueLimitPerServer`), so a load balancer or cache never shows
+ * an always-empty tank.
+ */
+.station-queue {
+  position: relative;
+  flex: none;
+  align-self: stretch;
+  width: 10px;
+  margin: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--easing-standard);
+}
+
+.station-queue-fill {
+  position: absolute;
+  z-index: 0;
+  inset: auto 0 0 0;
+  height: calc(var(--backlog-frac, 0) * 100%);
+  border-radius: inherit;
+  /* A banded fill reads as discrete units stacking up rather than a smooth
+     gauge sweep - it is meant to look like it is filling with things. */
+  background: repeating-linear-gradient(
+    to top,
+    var(--color-primary) 0px,
+    var(--color-primary) 3px,
+    color-mix(in oklab, var(--color-primary) 45%, var(--surface-sunken)) 3px,
+    color-mix(in oklab, var(--color-primary) 45%, var(--surface-sunken)) 5px
+  );
+  transition: height var(--duration-slow) var(--easing-standard);
+}
+
+/* High-water mark: written from a precomputed peak-so-far series, so it
+   holds its position as the fill recedes below it during drain. The gap
+   that opens up between this line and the fill top is the recovery itself,
+   made visible without reading a number. */
+.station-queue-peak {
+  position: absolute;
+  z-index: 1;
+  left: -1px;
+  right: -1px;
+  height: 2px;
+  bottom: calc(var(--backlog-peak-frac, 0) * 100%);
+  transform: translateY(50%);
+  background: color-mix(in oklab, var(--color-text) 60%, transparent);
+  pointer-events: none;
+}
+
+/* Saturate-and-shed is a third state, distinct from build and drain: the
+   fill stops moving because it has hit its ceiling and started rejecting
+   work instead. Colour changes, but so do the border style and a capping
+   lid, so the state never rides on hue alone. */
+.station[data-queue-state="shedding"] .station-queue {
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--color-danger) 60%, var(--hairline));
+}
+.station[data-queue-state="shedding"] .station-queue::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0; left: -1px; right: -1px;
+  height: 3px;
+  background: var(--color-danger);
+}
+.station[data-queue-state="shedding"] .station-queue-fill {
+  background: repeating-linear-gradient(
+    to top,
+    var(--color-danger) 0px,
+    var(--color-danger) 3px,
+    color-mix(in oklab, var(--color-danger) 45%, var(--surface-sunken)) 3px,
+    color-mix(in oklab, var(--color-danger) 45%, var(--surface-sunken)) 5px
+  );
+}
+
+/* Live backlog count, written imperatively per frame. Collapses to nothing
+   while empty so an idle or non-queueing station shows no stray gap, and
+   truncates like its siblings rather than forcing the row wider than the box. */
+.station-queue-count {
+  min-width: 0;
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--type-label-medium-size);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.station-queue-count:empty { display: none; }
+.station[data-queue-state="shedding"] .station-queue-count { color: var(--color-danger); }
+
 .station-handle {
   width: 9px;
   height: 9px;
@@ -587,7 +687,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .primary-button, .ghost-button, .danger-button, .palette-item,
-  .station, .station-load-fill, .edge-actions { transition: none; }
+  .station, .station-load-fill, .edge-actions,
+  .station-queue, .station-queue-fill { transition: none; }
 }
 
 .inspector { display: flex; flex-direction: column; gap: var(--space-3); }

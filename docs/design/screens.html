@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Network Builder — screen layouts</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:#0e1116; --sunken:#0a0d11; --surface:#151a21; --raised:#1b222b;
+    --line:#242c37; --line-bright:#38434f;
+    --ink:#e4e9ef; --ink-mute:#8b97a6; --ink-faint:#5b6674;
+    --signal:#3ddc97; --signal-dim:#1d6b4c;
+    --primary:#5b93f5; --warn:#e8b339; --alarm:#f2543d;
+    --grid:#161c24; --grid-major:#1d242e;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg:#f6f7f9; --sunken:#eceef1; --surface:#fff; --raised:#fff;
+    --line:#d8dde3; --line-bright:#b6bec8;
+    --ink:#161b22; --ink-mute:#5b6674; --ink-faint:#8b97a6;
+    --signal:#0d9b62; --signal-dim:#9fe0c4;
+    --primary:#2f6fe4; --warn:#b5810d; --alarm:#cc3a24;
+    --grid:#e6e9ed; --grid-major:#dbe0e6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; padding:0 0 64px; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:14px; line-height:1.55;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  header {
+    position:sticky; top:0; z-index:5; display:flex; align-items:center;
+    justify-content:space-between; gap:16px; padding:14px 28px;
+    background:var(--surface); border-bottom:1px solid var(--line);
+  }
+  h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:-.01em; }
+  .eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-mute); }
+  button {
+    font:inherit; font-size:12px; padding:6px 12px; border-radius:5px; cursor:pointer;
+    background:transparent; color:var(--ink-mute); border:1px solid var(--line-bright);
+  }
+  button:hover { color:var(--ink); background:var(--sunken); }
+  main { max-width:1180px; margin:0 auto; padding:32px 28px 0; }
+  section { margin-bottom:56px; }
+  h2 { font-size:15px; margin:0 0 4px; letter-spacing:-.01em; }
+  h2 .num { font-family:var(--mono); color:var(--signal); margin-right:10px; font-size:13px; }
+  .sub { color:var(--ink-mute); margin:0 0 20px; max-width:74ch; }
+  .frame {
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.18);
+  }
+  svg { display:block; width:100%; height:auto; }
+  .cap { font-family:var(--mono); font-size:10.5px; color:var(--ink-faint);
+    margin-top:10px; letter-spacing:.02em; }
+  .note { border-left:2px solid var(--signal); padding:2px 0 2px 14px;
+    margin:18px 0 0; color:var(--ink-mute); max-width:74ch; }
+  .note strong { color:var(--ink); font-weight:600; }
+  .bad { border-left-color:var(--alarm); }
+  /* SVG primitives */
+  .panel { fill:var(--sunken); stroke:var(--line-bright); stroke-width:1; rx:5; }
+  .panel-alt { fill:var(--raised); stroke:var(--line-bright); stroke-width:1; rx:5; }
+  .lbl { font-family:var(--sans); font-size:11.5px; fill:var(--ink); }
+  .lbl-mute { font-family:var(--sans); font-size:10.5px; fill:var(--ink-mute); }
+  .mono { font-family:var(--mono); font-size:10px; fill:var(--ink-mute); letter-spacing:.06em; }
+  .mono-sig { font-family:var(--mono); font-size:10px; fill:var(--signal); letter-spacing:.06em; }
+  .flow { stroke:var(--signal); stroke-width:1.5; fill:none; }
+  .wire { stroke:var(--line-bright); stroke-width:1.25; fill:none; }
+  .dash { stroke-dasharray:3 3; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="eyebrow">Network Builder · design review</div>
+    <h1>Screen layouts</h1>
+  </div>
+  <button id="t">Light theme</button>
+</header>
+
+<main>
+
+<section>
+  <h2><span class="num">01</span>Build — the existing screen, unchanged</h2>
+  <p class="sub">Answers one question: <em>why did p99 move in the run I just watched?</em>
+     Nothing here is being proposed; it is drawn so the two new surfaces can be judged
+     against it.</p>
+  <div class="frame">
+    <svg viewBox="0 0 1100 340" role="img" aria-label="Build screen layout">
+      <rect x="0" y="0" width="1100" height="340" fill="none"/>
+      <rect class="panel" x="8" y="8" width="1084" height="36"/>
+      <text class="lbl" x="24" y="31">Act I · Level 4 — Vertical vs Horizontal</text>
+      <text class="mono" x="940" y="31">BUILD | review</text>
+
+      <rect class="panel" x="8" y="52" width="230" height="280"/>
+      <text class="mono" x="24" y="74">THE SITUATION</text>
+      <text class="lbl-mute" x="24" y="94">brief · hint</text>
+      <text class="mono" x="24" y="128">ADD A COMPONENT</text>
+      <rect class="panel-alt" x="24" y="138" width="198" height="34"/>
+      <rect class="panel-alt" x="24" y="178" width="198" height="34"/>
+      <text class="mono" x="24" y="214">SELECTED</text>
+      <text class="lbl-mute" x="24" y="234">config · slots</text>
+
+      <rect class="panel" x="246" y="52" width="512" height="232"/>
+      <text class="mono" x="262" y="74">CANVAS</text>
+      <rect class="panel-alt" x="280" y="140" width="96" height="40"/>
+      <text class="lbl-mute" x="296" y="164">Users</text>
+      <rect class="panel-alt" x="470" y="140" width="96" height="40"/>
+      <text class="lbl-mute" x="486" y="164">Origin</text>
+      <rect x="560" y="146" width="4" height="28" fill="var(--alarm)"/>
+      <path class="flow" d="M376 160 L470 160"/>
+      <circle cx="404" cy="160" r="3" fill="var(--signal)"/>
+      <circle cx="432" cy="160" r="3" fill="var(--signal)"/>
+      <text class="mono-sig" x="392" y="196">queue 800 ▸ shedding</text>
+
+      <rect class="panel" x="246" y="292" width="512" height="40"/>
+      <rect x="262" y="304" width="82" height="18" rx="4" fill="var(--primary)"/>
+      <text class="mono" x="356" y="317" fill="var(--ink-mute)">▸ scrubber ————————</text>
+
+      <rect class="panel" x="766" y="52" width="326" height="280"/>
+      <text class="mono" x="782" y="74">P99 LATENCY</text>
+      <text class="lbl" x="782" y="104" style="font-size:26px;font-family:var(--mono)">10,150ms</text>
+      <rect class="panel-alt" x="782" y="120" width="294" height="52"/>
+      <text class="mono" x="794" y="140">sparkline + SLO line</text>
+      <rect class="panel-alt" x="782" y="184" width="294" height="44"/>
+      <text class="mono" x="794" y="204">attribution stack</text>
+      <rect class="panel-alt" x="782" y="240" width="294" height="76"/>
+      <text class="mono" x="794" y="260">★★☆ objectives</text>
+    </svg>
+    <div class="cap">Existing. Build mode.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">02</span>Review — a second mode, not a third screen</h2>
+  <p class="sub">The one question Build structurally cannot answer, and it only exists once
+     there is background load: <em>is this system right across the whole load envelope, not
+     just the run I watched?</em></p>
+  <div class="frame">
+    <svg viewBox="0 0 1100 372" role="img" aria-label="Review mode layout">
+      <rect class="panel" x="8" y="8" width="1084" height="36"/>
+      <text class="lbl" x="24" y="31">Act I · Level 4 — Vertical vs Horizontal</text>
+      <text class="mono" x="940" y="31">build | <tspan fill="var(--signal)">REVIEW</tspan></text>
+
+      <!-- envelope -->
+      <rect class="panel" x="8" y="52" width="1084" height="120"/>
+      <text class="mono" x="24" y="74">LOAD ENVELOPE — graded per window</text>
+      <path d="M40 148 L200 148 L240 106 L420 106 L460 148 L1060 148"
+            fill="var(--signal-dim)" opacity=".35" stroke="none"/>
+      <path class="flow" d="M40 148 L200 148 L240 106 L420 106 L460 148 L1060 148"/>
+      <line class="wire dash" x1="40" y1="128" x2="1060" y2="128"/>
+      <text class="mono" x="60" y="164">baseline</text>
+      <text class="mono-sig" x="300" y="98">peak window</text>
+      <text class="mono" x="700" y="164">recovery</text>
+      <rect x="240" y="88" width="180" height="66" fill="none"
+            stroke="var(--signal)" stroke-width="1" stroke-dasharray="2 3" rx="3"/>
+
+      <!-- headroom -->
+      <rect class="panel" x="8" y="180" width="300" height="92"/>
+      <text class="mono" x="24" y="202">HEADROOM AT PEAK</text>
+      <text x="24" y="238" style="font-size:24px;font-family:var(--mono);fill:var(--alarm)">−36%</text>
+      <text class="lbl-mute" x="24" y="258">needs 620 rps · has 400</text>
+
+      <rect class="panel" x="316" y="180" width="300" height="92"/>
+      <text class="mono" x="332" y="202">COST — BASELINE vs PEAK</text>
+      <rect x="332" y="216" width="120" height="14" fill="var(--primary)" rx="2"/>
+      <rect x="332" y="236" width="248" height="14" fill="var(--warn)" rx="2"/>
+      <text class="mono" x="464" y="228">$908 idle</text>
+      <text class="mono" x="592" y="248">$1,151</text>
+
+      <rect class="panel" x="624" y="180" width="468" height="92"/>
+      <text class="mono" x="640" y="202">RUN-TO-RUN DIFF <tspan fill="var(--signal)">— gate A2</tspan></text>
+      <path class="wire dash" d="M640 254 L780 244 L900 250 L1072 246"/>
+      <path class="flow" d="M640 240 L780 214 L900 226 L1072 218"/>
+      <text class="mono" x="640" y="268">ghost = previous run</text>
+
+      <!-- regions + console -->
+      <rect class="panel" x="8" y="280" width="608" height="84"/>
+      <text class="mono" x="24" y="302">PER-REGION BREAKDOWN — map lives here, Act IV onward</text>
+      <text class="lbl-mute" x="24" y="326">flat map by default · globe is a late cosmetic mode</text>
+
+      <rect class="panel" x="624" y="280" width="468" height="84"/>
+      <text class="mono" x="640" y="302">CONSOLE — a drawer, in both modes</text>
+      <text class="lbl-mute" x="640" y="326">must not cover the canvas it describes</text>
+    </svg>
+    <div class="cap">Proposed. Review mode — same route, same store, same playhead.</div>
+  </div>
+  <p class="note bad"><strong>Two corrections to the sketch.</strong> The terminal as a
+     pop-out modal defeats the Console's only real value — that its output agrees with the
+     canvas in front of you. And the globe loses to the flat map on density: it hides half
+     your PoPs at all times. The sketch already labelled it “alt”; that instinct was right.</p>
+</section>
+
+<section>
+  <h2><span class="num">03</span>Explorer — right shape, corrected axis</h2>
+  <p class="sub">Traffic enters from the left and passes through columns, exactly as sketched.
+     The columns are the <strong>latency waterfall</strong> rather than OSI layers, because
+     every column is then a quantity measured in every run.</p>
+  <div class="frame">
+    <svg viewBox="0 0 1100 300" role="img" aria-label="Layer explorer with waterfall axis">
+      <path class="flow" d="M8 150 L44 150"/>
+      <path class="flow" d="M36 144 L46 150 L36 156 Z" fill="var(--signal)"/>
+      <rect class="panel" x="52" y="20" width="1040" height="260"/>
+      <text class="mono" x="72" y="44">THE REQUEST'S JOURNEY — each column expands full screen</text>
+      <text class="mono" x="820" y="44">lens: <tspan fill="var(--signal)">JOURNEY</tspan> | osi layers</text>
+      <g>
+        <rect class="panel-alt" x="72" y="60" width="118" height="180"/>
+        <text class="lbl" x="82" y="86">Client</text>
+        <text class="mono" x="82" y="104">2 levels</text>
+        <rect class="panel-alt" x="200" y="60" width="118" height="180"/>
+        <text class="lbl" x="210" y="86">Resolution</text>
+        <text class="mono" x="210" y="104">5 levels</text>
+        <rect class="panel-alt" x="328" y="60" width="118" height="180"/>
+        <text class="lbl" x="338" y="86">Transport</text>
+        <text class="mono" x="338" y="104">4 levels</text>
+        <rect class="panel-alt" x="456" y="60" width="118" height="180" stroke="var(--signal)"/>
+        <text class="lbl" x="466" y="86">Edge</text>
+        <text class="mono-sig" x="466" y="104">9 levels</text>
+        <rect class="panel-alt" x="584" y="60" width="118" height="180"/>
+        <text class="lbl" x="594" y="86">Mid-tier</text>
+        <text class="mono" x="594" y="104">3 levels</text>
+        <rect class="panel-alt" x="712" y="60" width="118" height="180"/>
+        <text class="lbl" x="722" y="86">Entry</text>
+        <text class="mono" x="722" y="104">6 levels</text>
+        <rect class="panel-alt" x="840" y="60" width="118" height="180"/>
+        <text class="lbl" x="850" y="86">Compute</text>
+        <text class="mono" x="850" y="104">8 levels</text>
+        <rect class="panel-alt" x="968" y="60" width="106" height="180"/>
+        <text class="lbl" x="978" y="86">Data</text>
+        <text class="mono" x="978" y="104">4 levels</text>
+      </g>
+      <!-- contribution bars: the column IS a measured quantity -->
+      <g opacity=".95">
+        <rect x="82" y="214" width="12" height="16" fill="var(--signal-dim)"/>
+        <rect x="210" y="198" width="12" height="32" fill="var(--signal-dim)"/>
+        <rect x="338" y="186" width="12" height="44" fill="var(--signal-dim)"/>
+        <rect x="466" y="160" width="12" height="70" fill="var(--signal)"/>
+        <rect x="594" y="220" width="12" height="10" fill="var(--signal-dim)"/>
+        <rect x="722" y="212" width="12" height="18" fill="var(--signal-dim)"/>
+        <rect x="850" y="176" width="12" height="54" fill="var(--signal-dim)"/>
+        <rect x="978" y="222" width="12" height="8" fill="var(--signal-dim)"/>
+      </g>
+      <text class="mono" x="72" y="264">▸ bars show each column's contribution to YOUR last run's p99</text>
+    </svg>
+    <div class="cap">Proposed. Eight columns, generated from the content registries.</div>
+  </div>
+  <p class="note bad"><strong>Why not L0–L7.</strong> Counted against the 41 levels: L2 has
+     zero, L5 and L6 have zero, L7 has thirty-plus — and Kubernetes and security have no OSI
+     layer at all. Seven equal columns advertise seven equal bodies of content that do not
+     exist. Empty columns read as an unfinished game.</p>
+  <p class="note"><strong>Generate it, don't author it.</strong> Tag levels, terms and
+     components with a column id and derive the explorer from the existing registries. Two
+     hand-maintained hierarchies over one body of content is how an educational project rots —
+     and this repo already built the antidote for exactly that reason.</p>
+  <p class="note"><strong>The layered model still gets taught</strong> — as a primer before
+     Act I, as a second lens toggled over the same tagged content, and as footnotes on the
+     levels that earn it. Because the explorer is generated, a second tag dimension costs
+     nothing. In a reference view a sparse layer is informative; it was only as a campaign
+     map that empty columns read as unfinished.</p>
+  <p class="note"><em>Layers tell you what a thing <strong>is</strong>. The waterfall tells
+     you <strong>when it happens</strong> to your request. One is a taxonomy, the other a
+     timeline — both true, only one of them a route through a curriculum.</em></p>
+</section>
+
+<section>
+  <h2><span class="num">04</span>Navigation — one shell, two modes, one overlay</h2>
+  <div class="frame">
+    <svg viewBox="0 0 1100 200" role="img" aria-label="Navigation model">
+      <rect class="panel" x="120" y="24" width="400" height="70"/>
+      <text class="lbl" x="140" y="50">Shell — level context</text>
+      <text class="mono" x="140" y="72">topology · layout · result · playhead</text>
+      <rect class="panel-alt" x="120" y="112" width="190" height="56" stroke="var(--signal)"/>
+      <text class="lbl" x="140" y="136">Build</text>
+      <text class="mono" x="140" y="154">why did p99 move?</text>
+      <rect class="panel-alt" x="330" y="112" width="190" height="56" stroke="var(--signal)"/>
+      <text class="lbl" x="350" y="136">Review</text>
+      <text class="mono" x="350" y="154">right across the envelope?</text>
+      <path class="wire" d="M215 94 L215 112"/>
+      <path class="wire" d="M425 94 L425 112"/>
+      <rect class="panel" x="600" y="24" width="360" height="144" stroke-dasharray="4 3"/>
+      <text class="lbl" x="620" y="50">Codex — a sheet, not a route</text>
+      <text class="mono" x="620" y="72">entered from a question, never navigated to</text>
+      <text class="mono" x="620" y="92">· a refused connection's learnMoreId</text>
+      <text class="mono" x="620" y="110">· a term in a brief</text>
+      <text class="mono" x="620" y="128">· a column in the explorer</text>
+      <text class="mono-sig" x="620" y="152">returns you to the exact pixel</text>
+      <path class="wire dash" d="M520 140 L600 110"/>
+    </svg>
+    <div class="cap">Proposed. No router required yet — two tabs on one route.</div>
+  </div>
+  <p class="note"><strong>Switching modes must not stop playback.</strong> Both read the same
+     playhead, and Review must never call <code>simulate</code> itself — a second grading path
+     is how the numbers start disagreeing with each other.</p>
+</section>
+
+<section>
+  <h2><span class="num">05</span>Sequencing</h2>
+  <div class="frame">
+    <svg viewBox="0 0 1100 130" role="img" aria-label="Sequencing">
+      <line class="wire" x1="40" y1="70" x2="1060" y2="70"/>
+      <g>
+        <circle cx="90" cy="70" r="6" fill="var(--alarm)"/>
+        <text class="lbl" x="66" y="46">Phase 3</text>
+        <text class="mono" x="52" y="98">finish the gate</text>
+        <circle cx="290" cy="70" r="6" fill="var(--warn)"/>
+        <text class="lbl" x="250" y="46">Phase 4</text>
+        <text class="mono" x="228" y="98">3 engine defects</text>
+        <circle cx="500" cy="70" r="6" fill="var(--signal)"/>
+        <text class="lbl" x="466" y="46">Phase 5</text>
+        <text class="mono" x="450" y="98">Review mode</text>
+        <circle cx="700" cy="70" r="6" fill="var(--signal)"/>
+        <text class="lbl" x="666" y="46">Phase 5–6</text>
+        <text class="mono" x="664" y="98">codex</text>
+        <circle cx="880" cy="70" r="6" fill="var(--signal)"/>
+        <text class="lbl" x="846" y="46">Phase 6+</text>
+        <text class="mono" x="836" y="98">explorer</text>
+        <circle cx="1030" cy="70" r="6" fill="var(--ink-faint)"/>
+        <text class="lbl" x="1000" y="46">Phase 8</text>
+        <text class="mono" x="1004" y="98">map</text>
+      </g>
+    </svg>
+    <div class="cap">Nothing on the whiteboard fixes any of Phase 3's eleven failing criteria.</div>
+  </div>
+  <p class="note"><strong>Highest-value next change:</strong> criterion A2 as a ghost trace —
+     the previous run drawn behind the current one, with a delta column. About a day. Closes
+     A2, upgrades A1 and A4, probably lands E1, and is the cheapest step into the visual
+     direction, because overlaid history is the signature of telemetry.</p>
+</section>
+
+</main>
+<script>
+  const b = document.getElementById('t');
+  b.addEventListener('click', () => {
+    const light = document.documentElement.dataset.theme === 'light';
+    document.documentElement.dataset.theme = light ? 'dark' : 'light';
+    b.textContent = light ? 'Light theme' : 'Dark theme';
+  });
+</script>
+</body>
+</html>
