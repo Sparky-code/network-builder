@@ -81,6 +81,39 @@ export function topologicalOrder(
   return result;
 }
 
+/**
+ * Cache stations that no other cache sits in front of.
+ *
+ * Derived structurally rather than declared, so the engine never has to know
+ * what a "CDN PoP" or an "origin shield" is - only which caches a request meets
+ * first. That distinction is what separates the two hit-ratio numbers: the
+ * first tier drives user-visible latency, every tier together drives origin
+ * offload.
+ */
+export function firstTierCaches(g: SimGraph): ReadonlySet<NodeId> {
+  const isCache = (id: NodeId): boolean =>
+    g.stations.get(id)?.routing.kind === 'cache-split';
+
+  const result = new Set<NodeId>();
+  for (const id of g.order) {
+    if (!isCache(id)) continue;
+
+    // Walk upstream; if any ancestor is a cache, this one is not first tier.
+    const seen = new Set<NodeId>();
+    const stack: NodeId[] = (g.inbound.get(id) ?? []).map((e) => e.from);
+    let shadowed = false;
+    while (stack.length > 0) {
+      const up = stack.pop();
+      if (up === undefined || seen.has(up)) continue;
+      seen.add(up);
+      if (isCache(up)) { shadowed = true; break; }
+      for (const e of g.inbound.get(up) ?? []) stack.push(e.from);
+    }
+    if (!shadowed) result.add(id);
+  }
+  return result;
+}
+
 export interface Route {
   readonly hops: readonly NodeId[];
   readonly edges: readonly SimEdge[];
