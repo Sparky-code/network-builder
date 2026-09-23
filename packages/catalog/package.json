@@ -1,0 +1,14 @@
+{
+  "name": "@nb/catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@nb/schema": "*",
+    "@nb/sim": "*",
+    "zod": "^4.6.5"
+  }
+}
