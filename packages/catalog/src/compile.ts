@@ -156,7 +156,9 @@ export function topo(
     edges: links.map((l, i) => {
       const { fromPort, toPort } = resolve(l);
       return {
-        id: edgeId(`${l.from}->${l.to}#${i}`),
+        // Only [A-Za-z0-9_-]. These ids reach the DOM and selector-based
+        // lookups in the editor, where '>' and '#' are actively hostile.
+        id: edgeId(`e-${i}-${safeId(l.from)}-${safeId(l.to)}`),
         from: { nodeId: nodeId(l.from), portId: fromPort },
         to: { nodeId: nodeId(l.to), portId: toPort },
         config: {
@@ -167,3 +169,5 @@ export function topo(
     }),
   };
 }
+
+const safeId = (v: string): string => v.replace(/[^A-Za-z0-9_-]+/g, '_');
