@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Background, Controls, ReactFlow, ReactFlowProvider,
   type Connection, type Edge, type Node, type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Play, RotateCcw, Sun, Moon } from 'lucide-react';
+import { Play, Repeat, RotateCcw, Sun, Moon } from 'lucide-react';
 import { hasErrors } from '@nb/catalog';
 import { useTheme } from './hooks/use-theme';
 import { grade, nodeTypeOf, store, type GameState } from './game/state';
@@ -16,6 +16,16 @@ import { Hud } from './game/Hud';
 import { Palette } from './game/Palette';
 import { Inspector } from './game/Inspector';
 import './game/game.css';
+
+/**
+ * Playback is compressed to a roughly fixed wall-clock length. The ratio to
+ * simulated time is deliberately not 1:1 - what a player needs to see is the
+ * *shape* of the transient and the asymmetry between its halves, both of which
+ * survive compression, and neither of which survives a 65-second wait.
+ */
+const PLAYBACK_SECONDS = 11;
+/** 10Hz: the rate React is allowed to re-render at during playback. */
+const TICK_MS = 100;
 
 const nodeTypes = { station: StationNode };
 const edgeTypes = { traffic: TrafficEdge };
@@ -120,19 +130,47 @@ export default function App() {
   const grading = useMemo(() => grade(state), [state]);
   const blocked = hasErrors(state.diagnostics);
   const frames = state.result?.frames.length ?? 0;
+  const finished = frames > 0 && state.playhead >= frames - 1;
 
-  // Playback advances the playhead over a finished run. The simulation is
-  // already complete and deterministic before anything is drawn; this is
-  // presentation, not a live simulation.
+  // Bumping this restarts the effect below without a new run - the only way
+  // to ask for a second playback of the same result.
+  const [replayToken, setReplayToken] = useState(0);
+
+  // Playback advances the playhead over a finished run once, then holds on
+  // the last frame instead of looping. The simulation is already complete
+  // and deterministic before anything is drawn, so this is presentation, not
+  // a live simulation - but a build-then-drain transient that loops back to
+  // the calm baseline mid-recovery never resolves, which is exactly the
+  // asymmetry this game is trying to show. Holding at the end and offering an
+  // explicit Replay control makes "it's still working through the backlog"
+  // and "it's done recovering" two states a player can actually tell apart.
   useEffect(() => {
     if (state.result === null || frames === 0) return;
+    // Advance several frames per step so a run always takes about the same
+    // wall-clock time regardless of its simulated length. One frame per step
+    // would make this level's 26-second graded window take 65 seconds to
+    // watch, which no player will sit through ten times - and iterating ten
+    // times cheaply is itself a requirement (gate criterion D3).
+    //
+    // Frame data therefore steps at 10Hz while the canvas keeps animating at
+    // 60fps from whichever frame is current, which is the split the rendering
+    // architecture was designed around.
+    const step = Math.max(1, Math.round(frames / (PLAYBACK_SECONDS * 1000 / TICK_MS)));
     const id = window.setInterval(() => {
       const s = store.getSnapshot();
       if (s.result === null) return;
-      store.setPlayhead((s.playhead + 1) % s.result.frames.length);
-    }, 100);
+      const next = s.playhead + step;
+      if (next >= s.result.frames.length - 1) {
+        // Land exactly on the final frame: holding one step short would leave
+        // the queue looking permanently part-drained.
+        store.setPlayhead(s.result.frames.length - 1);
+        window.clearInterval(id);
+        return;
+      }
+      store.setPlayhead(next);
+    }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [state.result, frames]);
+  }, [state.result, frames, replayToken]);
 
   const errors = state.diagnostics.filter((d) => d.severity === 'error');
   const warnings = state.diagnostics.filter((d) => d.severity === 'warning');
@@ -200,6 +238,17 @@ export default function App() {
                 aria-label="Playback position"
               />
             </label>
+          )}
+
+          {finished && (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => { store.setPlayhead(0); setReplayToken((t) => t + 1); }}
+            >
+              <Repeat size={15} />
+              Replay
+            </button>
           )}
 
           <div className="runbar-status">
