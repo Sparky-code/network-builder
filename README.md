@@ -25,13 +25,70 @@ there, an origin shield someone else configured years ago. The pieces get cargo-
 because the feedback loop is too slow and too expensive to experiment with. You cannot
 casually try "what if we removed the shield" against production.
 
-The parts of this space that are already well taught are well taught by others:
-[k8sgames](https://k8sgames.com/) covers Kubernetes as a playable cluster, and
-[systemdesignsimulator.org](https://systemdesignsimulator.org/) offers animated widgets
-per topic. What nobody owns is the **edge-delivery path as one continuous, measurable
-system** — anycast, GeoDNS, TTLs, origin shields, PoP failover — that you build yourself
-and are graded on. That is the gap this fills, and Kubernetes and security then follow as
-the same topology seen at a different altitude, not as a separate product.
+### What already exists
+
+The build-simulate-grade format is **not novel, and that is worth stating plainly.**
+Several tools already do a version of it well:
+
+| Tool | What it does | Where it stops |
+| --- | --- | --- |
+| [systemdesignsim.com](https://systemdesignsim.com/) | Drag components, wire, send live traffic, graded against SLOs and cost budgets across 7 progressive challenges, with chaos injection | No edge/CDN depth, no Kubernetes, no security; emphasises experimentation over instruction |
+| [paperdraw.dev](https://paperdraw.dev) | Sandbox drag-and-drop with live latency/error/throughput/cache metrics and chaos switches | Sandbox only — no curriculum, levels or grading |
+| [k8sgames](https://k8sgames.com/) | Kubernetes as a playable 3D cluster with real `kubectl`, campaign and chaos modes | Kubernetes only; nothing upstream of the cluster |
+| [packetlab.io](https://packetlab.io/) | **325 scenarios** with a prerequisite graph, covering essentially this entire curriculum — `cdn-origin-shield`, `geodns-anycast`, `load-balancer-health-checks`, `kubernetes-ingress`, `service-mesh-mtls`, `zero-trust`. Step-through animated explainers with clickable packets | You watch, you do not build. Controls are play/step/reset on an authored, fixed topology — no components to place, no parameters to change, nothing graded. Most edge and security scenarios are paywalled |
+
+That the format keeps being independently reinvented is a signal it works. Treating it as
+unclaimed territory would have been wrong.
+
+### What is actually unclaimed
+
+Neither the format nor the topic list is novel. **The combination is.**
+
+The prior art splits cleanly along one axis — *depth of subject* versus *agency of the
+learner* — and nothing occupies both corners:
+
+```
+                    depth of subject matter
+                    shallow            deep
+                  ┌─────────────────┬─────────────────┐
+     you build    │ systemdesignsim │                 │
+     and are      │ paperdraw       │   ← empty →     │
+     graded       │ k8sgames (k8s)  │                 │
+                  ├─────────────────┼─────────────────┤
+     you watch    │                 │ packetlab       │
+     or read      │                 │ (325 scenarios) │
+                  └─────────────────┴─────────────────┘
+```
+
+Packetlab already explains origin shields, GeoDNS versus anycast, health-check behaviour,
+service-mesh mTLS and Kubernetes ingress — more topics than this roadmap lists. But its
+controls are play, step and reset over a fixed authored diagram. You cannot place a
+shield, get it wrong, and watch your origin melt. systemdesignsim gives you exactly that
+agency, but over components with no interior: a "CDN" is one box with a hit-ratio dial.
+
+The bet is that **consequence is what makes these concepts stick**. Reading that splitting
+traffic across PoPs lowers per-PoP hit ratio is a fact you forget. Watching your own
+origin load climb *after you added PoPs to make things faster*, then discovering the
+shield that fixes it, is a thing you keep.
+
+Three things follow from occupying that corner:
+
+**The edge path has an interior.** Acts III and IV are thirteen levels on what is inside
+the box other builders draw as "CDN" — TTL against staleness, key cardinality, stampede
+and coalescing, shield re-aggregation, edge hit ratio versus total hit ratio as two
+numbers with different jobs.
+
+**One topology across three domains.** Network, then containers, then security, built so
+the continuities are structural rather than asserted. An Ingress genuinely *is* the load
+balancer from Act II, re-parameterised. Scenario libraries teach these as separate
+entries; here they are the same object seen again.
+
+**A simulation you can audit.** Fluid flow with Erlang C and Allen–Cunneen queueing,
+Whitt variance propagation, exact TTL-cache renewal maths, validated against a
+discrete-event oracle and anchored to published figures — see
+[`docs/simulation-model.md`](docs/simulation-model.md). Consequence only teaches if the
+consequences are right, which is why the model is documented well enough to be argued
+with.
 
 ## The design bet
 

@@ -52,7 +52,7 @@ Six acts. Each level is named for the lesson, not the component.
 | Act | Levels | Arc | Chaos set-piece |
 | --- | --- | --- | --- |
 | **I — The Request** | 4 | One origin. The request waterfall, and distance as a budget | — |
-| **II — The Local Site** | 5 | Load balancing, health checks, session state, pooling, the DB bottleneck | Black Friday: 10× traffic |
+| **II — The Local Site** | 5 | Load balancing, health checks, session state, pooling, the DB bottleneck | Peak Day: 10× traffic |
 | **III — Caching** | 7 | Hit ratio, TTLs, cache keys, stampedes, origin shield, purge | Mass expiry |
 | **IV — Going Global** | 6 | Many PoPs, GeoDNS, anycast, failover, replication, steering | Fiber cut |
 | **V — Containers** | 10 | Pods, services, ingress, probes, limits, HPA, rollouts, state | Bad deploy |

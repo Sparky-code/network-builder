@@ -23,7 +23,7 @@ Star grading throughout: ★ SLO met · ★★ under budget · ★★★ survive
 Four levels, one origin, no distractions. The player learns to read a request before they
 are allowed to change one.
 
-### 1. Hello, Origin
+### 1. Anatomy of a Request
 - **Concept** — a request is a sequence of round trips, not an instant.
 - **Mechanic** — one client, one origin, low traffic. The attribution waterfall opens for
   the first time and shows DNS → TCP → TLS → HTTP as separate bars.
@@ -64,7 +64,7 @@ are allowed to change one.
 
 Five levels plus the first chaos event. One site, made properly resilient.
 
-### 5. Add a Load Balancer
+### 5. Something Has to Choose
 - **Concept** — something has to decide which backend serves each request.
 - **Mechanic** — round-robin against least-connections, with deliberately uneven service
   times so the two visibly diverge at the tail.
@@ -110,7 +110,7 @@ Five levels plus the first chaos event. One site, made properly resilient.
   replication lag.
 - **CI claim** — `a Cv²=4.0 station at ρ=0.6 has higher p99 than a Cv²=0.5 station at ρ=0.85`.
 
-### ⚡ Chaos 1 — Black Friday
+### ⚡ Chaos 1 — Peak Day
 10× traffic against the site the player built in levels 5–9. Whatever they skimped on
 fails first. Survival requires headroom, shedding, or both — and the post-mortem names
 which of their own earlier choices decided the outcome.
