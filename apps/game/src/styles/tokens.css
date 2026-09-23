@@ -1,0 +1,113 @@
+/**
+ * GENERATED FILE — do not hand-edit.
+ * Source: tokens/design-tokens.json
+ * Compiled by: style-dictionary.config.js (npm run tokens:build)
+ */
+
+:root {
+  /* Spacing (8px grid + half-step) */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* Type scale (Material-3-inspired minimalist subset) */
+  --type-display-large-size: 57px;
+  --type-display-large-line-height: 64px;
+  --type-display-large-weight: 400;
+  --type-headline-large-size: 32px;
+  --type-headline-large-line-height: 40px;
+  --type-headline-large-weight: 400;
+  --type-headline-medium-size: 28px;
+  --type-headline-medium-line-height: 36px;
+  --type-headline-medium-weight: 400;
+  --type-title-large-size: 22px;
+  --type-title-large-line-height: 28px;
+  --type-title-large-weight: 500;
+  --type-title-medium-size: 16px;
+  --type-title-medium-line-height: 24px;
+  --type-title-medium-weight: 500;
+  --type-body-large-size: 16px;
+  --type-body-large-line-height: 24px;
+  --type-body-large-weight: 400;
+  --type-body-medium-size: 14px;
+  --type-body-medium-line-height: 20px;
+  --type-body-medium-weight: 400;
+  --type-label-large-size: 14px;
+  --type-label-large-line-height: 20px;
+  --type-label-large-weight: 500;
+  --type-label-medium-size: 12px;
+  --type-label-medium-line-height: 16px;
+  --type-label-medium-weight: 500;
+
+  /* Elevation / shadow scale */
+  --elevation-0: none;
+  --elevation-1: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --elevation-2: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --elevation-3: 0 2px 6px -1px rgb(0 0 0 / 0.10), 0 1px 3px -1px rgb(0 0 0 / 0.08);
+  --elevation-4: 0 4px 10px -2px rgb(0 0 0 / 0.12), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+  --elevation-5: 0 8px 20px -4px rgb(0 0 0 / 0.14), 0 4px 8px -4px rgb(0 0 0 / 0.10);
+
+  /* Radius scale */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-emphasized: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Color roles — light is the default/fallback before data-theme is set */
+  --color-background: oklch(0.98 0.003 90);
+  --color-surface: oklch(0.995 0.002 90);
+  --color-surface-variant: oklch(0.95 0.004 90);
+  --color-border: oklch(0.88 0.005 90);
+  --color-text: oklch(0.20 0.01 285);
+  --color-text-muted: oklch(0.50 0.01 285);
+  --color-primary: oklch(0.45 0.09 260);
+  --color-primary-hover: oklch(0.38 0.09 260);
+  --color-on-primary: oklch(0.98 0.005 260);
+  --color-success: oklch(0.55 0.10 145);
+  --color-warning: oklch(0.72 0.13 80);
+  --color-danger: oklch(0.55 0.18 25);
+}
+
+:root[data-theme='light'] {
+  --color-background: oklch(0.98 0.003 90);
+  --color-surface: oklch(0.995 0.002 90);
+  --color-surface-variant: oklch(0.95 0.004 90);
+  --color-border: oklch(0.88 0.005 90);
+  --color-text: oklch(0.20 0.01 285);
+  --color-text-muted: oklch(0.50 0.01 285);
+  --color-primary: oklch(0.45 0.09 260);
+  --color-primary-hover: oklch(0.38 0.09 260);
+  --color-on-primary: oklch(0.98 0.005 260);
+  --color-success: oklch(0.55 0.10 145);
+  --color-warning: oklch(0.72 0.13 80);
+  --color-danger: oklch(0.55 0.18 25);
+}
+
+:root[data-theme='dark'] {
+  --color-background: oklch(0.16 0.004 285);
+  --color-surface: oklch(0.20 0.005 285);
+  --color-surface-variant: oklch(0.24 0.006 285);
+  --color-border: oklch(0.32 0.006 285);
+  --color-text: oklch(0.93 0.005 90);
+  --color-text-muted: oklch(0.68 0.01 285);
+  --color-primary: oklch(0.72 0.11 260);
+  --color-primary-hover: oklch(0.78 0.11 260);
+  --color-on-primary: oklch(0.14 0.01 260);
+  --color-success: oklch(0.75 0.12 145);
+  --color-warning: oklch(0.80 0.13 80);
+  --color-danger: oklch(0.72 0.16 25);
+}

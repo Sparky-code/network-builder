@@ -7,10 +7,12 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/game/tsconfig.app.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "oxlint packages/ --max-warnings=0"
+    "lint": "oxlint packages/ --max-warnings=0",
+    "dev": "npm run dev --workspace @nb/game",
+    "build": "npm run build --workspace @nb/game"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
