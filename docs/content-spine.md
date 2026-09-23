@@ -50,7 +50,8 @@ are allowed to change one.
 - **Concept** — queueing delay explodes long before capacity runs out.
 - **Mechanic** — a traffic slider against a **single-server** origin (50 rps of capacity).
   The player raises rps and watches p99 curve upward while the server still reports spare
-  capacity: 173ms at ρ=0.5, 474ms at ρ=0.84, 1161ms at ρ=0.94, and 14s at ρ=1.0.
+  capacity: 115ms at ρ=0.24, 169ms at ρ=0.5, 247ms at ρ=0.7, 452ms at ρ=0.84, 1182ms at
+  ρ=0.94, and 14.0s at ρ=1.0.
 - **Target** — p99 < 300ms, which forces the player to stay below ~75% utilization.
 - **Deep dive** — utilization ρ, Erlang C, Little's law, the `1/(1−ρ)` term, pooling.
 - **CI claims** — `p99 rises monotonically with ρ`; `p99 at ρ=0.94 is more than 5× p99 at

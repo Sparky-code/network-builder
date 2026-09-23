@@ -126,11 +126,30 @@ export function buildKernel(input: KernelInput): LatencyKernel {
   };
 }
 
-/** Inverse of the wait component. Returns ms. */
+/**
+ * Inverse of the wait component. Returns ms.
+ *
+ * The wait is a mixture: zero with probability (1 - pWait), else exponential.
+ * Its CDF is
+ *
+ *   F(w) = (1 - pWait) + pWait * (1 - exp(-rate * w))
+ *
+ * so the waiting branch occupies the UPPER tail of u, above (1 - pWait).
+ *
+ * An earlier version assigned the waiting branch to *low* u instead. That still
+ * sampled the right marginal, but it was not the inverse CDF it claimed to be,
+ * and it broke monotonicity: adding capacity shrinks pWait, which pushed probes
+ * just under the old threshold deep into the conditional tail, so more servers
+ * could yield a *higher* p99. Property testing caught it at c=3, S=1ms,
+ * rho=0.3685 - 3.77ms against 3.67ms.
+ */
 export function invWaitMs(k: LatencyKernel, u: number): number {
   if (k.pWait <= 0 || k.waitRateHz <= 0) return 0;
-  if (u >= k.pWait) return 0;
-  return (-Math.log(1 - u / k.pWait) / k.waitRateHz) * 1000;
+  const noWaitBelow = 1 - k.pWait;
+  if (u <= noWaitBelow) return 0;
+  // Clamped so a uniform of exactly 1 cannot produce an infinite wait.
+  const tail = Math.max(Number.EPSILON, (1 - u) / k.pWait);
+  return (-Math.log(tail) / k.waitRateHz) * 1000;
 }
 
 /** Inverse of the service component. Returns ms. */

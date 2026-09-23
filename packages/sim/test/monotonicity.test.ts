@@ -69,7 +69,13 @@ describe('queueing invariants', () => {
           quantile(before.latencyMs, 0.99) + 1e-6,
         );
       }),
-      { numRuns: 200 },
+      {
+        numRuns: 200,
+        // Pinned regression: this found invWaitMs assigning the waiting branch
+        // to low u instead of the upper tail, so shrinking pWait pushed probes
+        // deep into the conditional tail and more servers gave a higher p99.
+        examples: [[3, 1, 0.3685]],
+      },
     );
   });
 
