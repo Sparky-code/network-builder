@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens are compiled by Style Dictionary from tokens/design-tokens.json
+ * into ./tokens.css (generated — do not hand-edit). Import it before the
+ * @theme block below so the token custom properties exist when Tailwind
+ * resolves them.
+ */
+@import "./tokens.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+/*
+ ---break---
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * IMPORTANT: this uses plain `@theme`, NOT `@theme inline`.
+ *
+ * `@theme inline` bakes the *resolved value* of each referenced custom
+ * property into the generated utility class at build time. Our light/dark
+ * switch works by swapping which value a given `--color-*` custom property
+ * holds at runtime, via the `[data-theme="light"]` / `[data-theme="dark"]`
+ * attribute selectors in tokens.css (see use-theme.ts). If we used
+ * `@theme inline` here, Tailwind would freeze `bg-primary` etc. to whichever
+ * value was active at build time and the runtime toggle would stop working.
+ * Plain `@theme` keeps the utility's generated CSS as `var(--color-primary)`,
+ * so the attribute-selector swap in tokens.css keeps working with zero
+ * rebuild. Do not "simplify" this to `@theme inline`.
+ */
+@theme {
+  /* Color roles -> Tailwind color namespace */
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-variant: var(--color-surface-variant);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-on-primary: var(--color-on-primary);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+
+  /*
+   * shadcn/Base UI components are generated with shadcn's own conventional
+   * class names (bg-primary, text-primary-foreground, bg-muted, bg-card,
+   * border-input, ring-ring, etc.) baked into their source. Rather than
+   * hand-edit every generated component to use our token names directly,
+   * alias shadcn's expected names onto our existing token values here. This
+   * is the ONLY place that mapping happens — there is still exactly one
+   * palette (ours), just exposed under two label sets so shadcn's copied
+   * component code resolves correctly without modification.
+   */
+  --color-foreground: var(--color-text);
+  --color-primary-foreground: var(--color-on-primary);
+  --color-secondary: var(--color-surface-variant);
+  --color-secondary-foreground: var(--color-text);
+  --color-muted: var(--color-surface-variant);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-destructive: var(--color-danger);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-text);
+  --color-input: var(--color-border);
+  --color-ring: var(--color-primary);
+  --radius: var(--radius-md);
+
+  /* Spacing (8px grid + half-step) -> Tailwind spacing namespace */
+  --spacing-0: var(--space-0);
+  --spacing-1: var(--space-1);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-7: var(--space-7);
+  --spacing-8: var(--space-8);
+  --spacing-9: var(--space-9);
+
+  /* Type scale -> Tailwind font-size namespace (size / line-height pairs) */
+  --font-size-display-large: var(--type-display-large-size);
+  --line-height-display-large: var(--type-display-large-line-height);
+  --font-weight-display-large: var(--type-display-large-weight);
+
+  --font-size-headline-large: var(--type-headline-large-size);
+  --line-height-headline-large: var(--type-headline-large-line-height);
+  --font-weight-headline-large: var(--type-headline-large-weight);
+
+  --font-size-headline-medium: var(--type-headline-medium-size);
+  --line-height-headline-medium: var(--type-headline-medium-line-height);
+  --font-weight-headline-medium: var(--type-headline-medium-weight);
+
+  --font-size-title-large: var(--type-title-large-size);
+  --line-height-title-large: var(--type-title-large-line-height);
+  --font-weight-title-large: var(--type-title-large-weight);
+
+  --font-size-title-medium: var(--type-title-medium-size);
+  --line-height-title-medium: var(--type-title-medium-line-height);
+  --font-weight-title-medium: var(--type-title-medium-weight);
+
+  --font-size-body-large: var(--type-body-large-size);
+  --line-height-body-large: var(--type-body-large-line-height);
+  --font-weight-body-large: var(--type-body-large-weight);
+
+  --font-size-body-medium: var(--type-body-medium-size);
+  --line-height-body-medium: var(--type-body-medium-line-height);
+  --font-weight-body-medium: var(--type-body-medium-weight);
+
+  --font-size-label-large: var(--type-label-large-size);
+  --line-height-label-large: var(--type-label-large-line-height);
+  --font-weight-label-large: var(--type-label-large-weight);
+
+  --font-size-label-medium: var(--type-label-medium-size);
+  --line-height-label-medium: var(--type-label-medium-line-height);
+  --font-weight-label-medium: var(--type-label-medium-weight);
+
+  /* Elevation -> custom --shadow-* namespace used via shadow-[var(...)] or box-shadow utilities */
+  --shadow-elevation-0: var(--elevation-0);
+  --shadow-elevation-1: var(--elevation-1);
+  --shadow-elevation-2: var(--elevation-2);
+  --shadow-elevation-3: var(--elevation-3);
+  --shadow-elevation-4: var(--elevation-4);
+  --shadow-elevation-5: var(--elevation-5);
+
+  /* Radius -> Tailwind radius namespace */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+
+  /* Motion */
+  --default-transition-duration: var(--duration-normal);
+  --default-transition-timing-function: var(--easing-standard);
+
+  /* Font family */
+  --font-sans:
+    'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+/*
+ * The shadcn `init` scaffold generates a default `@theme inline` + `:root` +
+ * `.dark` block here with its own neutral gray palette (sidebar/chart tokens
+ * included). That's deleted entirely — this project has exactly one
+ * palette, defined above from design-tokens.json, aliased to shadcn's
+ * expected names. Do not reintroduce a second color block here.
+ */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
