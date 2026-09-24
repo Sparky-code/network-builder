@@ -25,6 +25,15 @@ export interface GameState {
   readonly selected: string | null;
   readonly diagnostics: readonly Diagnostic[];
   readonly result: RunResult | null;
+  /**
+   * The run before this one, kept so a player can see what their change did.
+   *
+   * Deliberately survives topology edits, unlike `result`. Comparing across an
+   * edit is the entire point: "I added a load balancer, what moved?" is the
+   * question the game exists to answer, and it cannot be asked if the baseline
+   * is discarded the moment the topology changes.
+   */
+  readonly previousResult: RunResult | null;
   readonly running: boolean;
   /** Index into result.frames during playback, or -1 when idle. */
   readonly playhead: number;
@@ -46,6 +55,7 @@ function initialState(): GameState {
     selected: null,
     diagnostics: validate(topology, CATALOG),
     result: null,
+    previousResult: null,
     running: false,
     playhead: -1,
     lastError: null,
@@ -72,9 +82,14 @@ class Store {
     this.set({
       topology,
       diagnostics: validate(topology, CATALOG),
-      // Any edit invalidates the previous run: showing metrics for a topology
-      // that no longer exists is worse than showing none.
+      // An edit invalidates the current run - showing metrics for a topology
+      // that no longer exists is worse than showing none - but it is also the
+      // moment that run becomes worth comparing against. Demoting rather than
+      // discarding is what makes "I changed one thing, what moved?" answerable;
+      // clearing it outright loses the baseline in exactly the case the
+      // comparison exists for.
       result: null,
+      previousResult: this.state.result ?? this.state.previousResult,
       playhead: -1,
       ...extra,
     });
@@ -216,7 +231,13 @@ class Store {
       const result = simulate({ ...compiled, scenario: LEVEL.scenario });
       // The run is complete and deterministic before anything is drawn.
       // Playback is presentation over a finished result, not a live simulation.
-      this.set({ result, running: false, playhead: 0 });
+      this.set({
+        result,
+        // The run being replaced becomes the baseline for the next comparison.
+        previousResult: this.state.result ?? this.state.previousResult,
+        running: false,
+        playhead: 0,
+      });
     } catch (e) {
       this.set({
         running: false,
