@@ -123,6 +123,9 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
 
   // Live values the frame loop reads without re-subscribing.
   const geometryRef = useRef<EdgeGeometry[]>([]);
+  // Read inside the frame loop; kept in a ref so the loop never re-subscribes.
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
   const runRef = useRef<{ result: RunResult | null; playhead: number }>({ result, playhead });
   runRef.current = { result, playhead };
 
@@ -203,6 +206,32 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
     const styles = getComputedStyle(document.documentElement);
     const inkOk = styles.getPropertyValue('--color-primary').trim() || '#3b82f6';
     const inkBad = styles.getPropertyValue('--color-danger').trim() || '#ef4444';
+    // Distinct from danger on purpose: a shedding station and a Delete button
+    // must not be the same red, or saturation cannot read as an event.
+    const inkAlarm = styles.getPropertyValue('--color-alarm').trim() || inkBad;
+
+    /*
+     * Saturation shockwaves.
+     *
+     * A station crossing into shedding emits a ring from its own position. The
+     * transition is the event; the sustained alarm ring underneath is the
+     * state. Both are drawn on the canvas rather than as node styling, so they
+     * are visible with the metrics rail covered - which is the bar criterion B1
+     * actually sets.
+     */
+    const MAX_WAVES = 24;
+    const waveX = new Float32Array(MAX_WAVES);
+    const waveY = new Float32Array(MAX_WAVES);
+    const waveAge = new Float32Array(MAX_WAVES);
+    const waveLive = new Uint8Array(MAX_WAVES);
+    let waveCursor = 0;
+    const wasShedding = new Set<string>();
+
+    const emitWave = (x: number, y: number): void => {
+      const i = waveCursor % MAX_WAVES;
+      waveCursor += 1;
+      waveX[i] = x; waveY[i] = y; waveAge[i] = 0; waveLive[i] = 1;
+    };
 
     const frame = (now: number): void => {
       raf = requestAnimationFrame(frame);
@@ -258,6 +287,41 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
         }
       }
 
+      // Detect stations entering the shedding state, using the node's own box so
+      // the ring is centred on the thing that is failing.
+      if (frameData !== undefined) {
+        for (const el of document.querySelectorAll<HTMLElement>('[data-station]')) {
+          const id = el.dataset['station'];
+          if (id === undefined) continue;
+          const shedding = (frameData.stations[id]?.droppedRps ?? 0) > 0;
+          if (shedding && !wasShedding.has(id)) {
+            const pos = positionsRef.current[id];
+            if (pos !== undefined && !reduceMotion) {
+              emitWave(pos.x + STATION_W / 2, pos.y + STATION_H / 2);
+            }
+            wasShedding.add(id);
+          } else if (!shedding) {
+            wasShedding.delete(id);
+          }
+        }
+      }
+
+      // Rings first, so packets draw over them.
+      for (let i = 0; i < MAX_WAVES; i++) {
+        if (waveLive[i] === 0) continue;
+        const age = (waveAge[i] ?? 0) + dt;
+        waveAge[i] = age;
+        if (age > 0.9) { waveLive[i] = 0; continue; }
+        const t = age / 0.9;
+        ctx.globalAlpha = (1 - t) * 0.7;
+        ctx.strokeStyle = inkAlarm;
+        ctx.lineWidth = 2.5 * (1 - t) + 0.5;
+        ctx.beginPath();
+        ctx.arc(waveX[i] ?? 0, waveY[i] ?? 0, 40 + t * 90, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
       ctx.lineCap = 'round';
       for (let i = 0; i < MAX_PACKETS; i++) {
         if (alive[i] === 0) continue;
@@ -268,9 +332,17 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
         const geo = geometry[edgeIdx[i] ?? 0];
         if (geo === undefined) { alive[i] = 0; free.push(i); continue; }
 
-        // A dropped packet stops partway and fades, rather than arriving.
+        /*
+         * A dropped request travels almost the whole way, is refused at the
+         * door, and is visibly deflected away from it.
+         *
+         * Fading out mid-path made a drop read as a rendering artefact. Being
+         * turned away at the station is what shedding actually is, and it is
+         * what makes an individual failure pointable-at - criterion B3.
+         */
         const dropped = fate[i] === 1;
-        const travel = dropped ? Math.min(next, 0.62) : next;
+        const DOOR = 0.88;
+        const travel = dropped ? Math.min(next, DOOR) : next;
         const s = travel * (LUT_SAMPLES - 1);
         const i0 = Math.floor(s);
         const frac = s - i0;
@@ -278,11 +350,28 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
         const x = (geo.lut[i0 * 2] ?? 0) * (1 - frac) + (geo.lut[i1 * 2] ?? 0) * frac;
         const y = (geo.lut[i0 * 2 + 1] ?? 0) * (1 - frac) + (geo.lut[i1 * 2 + 1] ?? 0) * frac;
 
-        ctx.globalAlpha = dropped && next > 0.62 ? Math.max(0, 1 - (next - 0.62) * 4) : 0.85;
-        ctx.fillStyle = dropped ? inkBad : inkOk;
-        ctx.beginPath();
-        ctx.arc(x, y, dropped ? 3.4 : 2.6, 0, Math.PI * 2);
-        ctx.fill();
+        if (dropped && next > DOOR) {
+          // Refused: deflect off the door and fall away, fading as it goes.
+          const t = Math.min(1, (next - DOOR) / (1 - DOOR));
+          ctx.globalAlpha = Math.max(0, 1 - t);
+          ctx.strokeStyle = inkAlarm;
+          ctx.lineWidth = 1.6;
+          const dx = -10 * t;
+          const dy = 26 * t * t;
+          const r = 3.2;
+          // A small cross, so a refusal is a distinct mark and not just a dot
+          // in a different colour.
+          ctx.beginPath();
+          ctx.moveTo(x + dx - r, y + dy - r); ctx.lineTo(x + dx + r, y + dy + r);
+          ctx.moveTo(x + dx + r, y + dy - r); ctx.lineTo(x + dx - r, y + dy + r);
+          ctx.stroke();
+        } else {
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = dropped ? inkAlarm : inkOk;
+          ctx.beginPath();
+          ctx.arc(x, y, dropped ? 3.2 : 2.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.globalAlpha = 1;
 
