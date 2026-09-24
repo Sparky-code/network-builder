@@ -75,8 +75,8 @@ Sequenced so the riskiest thing is proven first.
 | **0 — Design** | Roadmap, simulation model, content spine, architecture, ADRs | Design reviewed and agreed |
 | **1 — Engine core** ✅ | `@nb/schema` + `@nb/sim`: station, tick loop, Erlang/Allen–Cunneen, latency kernels, route probes. Headless, with analytic and DES oracle tests. **No UI at all** | Act I numbers are defensible and deterministic |
 | **2 — Catalog + determinism harness** ✅ | Six component types with ports and costs; shuffle, conservation, monotonicity and golden-snapshot tests. Plus the throwaway HPA spike (below) | Shuffled-input runs are bit-identical |
-| **3 — Vertical slice** ← *next* | `apps/game`: React Flow editor, validation, canvas packet overlay, one hardcoded level | The loop is *fun*, not merely correct — [18 criteria](docs/quality-gates.md) |
-| **4 — Content harness + Act I** | `defineLevel`, zod validation, the `explains`/`demonstrations` CI checks, [derived hints](docs/content-spine.md), levels 1–4 | A lesson cannot silently become false, and no advice is written for a player who does not exist |
+| **3 — Vertical slice** ✅ | `apps/game`: React Flow editor, validation, canvas packet overlay, one hardcoded level | The loop is *fun*, not merely correct — [18 criteria](docs/quality-gates.md) |
+| **4 — Content harness + Act I** ← *next* | `defineLevel`, zod validation, the `explains`/`demonstrations` CI checks, [derived hints](docs/content-spine.md), levels 1–4 | A lesson cannot silently become false, and no advice is written for a player who does not exist |
 | **5 — Grading + attribution** | Latency attribution waterfall, run-to-run diff, star grading | "Why did p99 move?" is answerable at a glance |
 | **6 — Act II + Chaos 1** | First chaos set-piece, on the player's own topology | Chaos reads as consequence, not a new game |
 | **7 — Act III** | Caching — the densest and most valuable act | Hit-ratio maths reads as true to a reviewer |
@@ -84,6 +84,22 @@ Sequenced so the riskiest thing is proven first.
 | **9 — Console v1** | Terminal drawer over live simulation state | — |
 | **10 — Act V, then Act VI** | Kubernetes, then security | — |
 | **11 — Polish** | Difficulty tiers, persistence, sandbox mode | — |
+
+### Carried into Phase 4
+
+**Gate criterion D2 — "the canvas is alive between runs" — is unmet and deliberately
+deferred.** An idle topology currently reads as a saved diagram rather than as a system that
+happens to be quiet.
+
+The honest fix is background load: a baseline running at a rate the topology handles, so
+`Send traffic` means "show me the peak" rather than "start the world". That is the load
+envelope already scheduled for Phase 4, so D2 closes as a side effect of work already
+planned rather than needing its own. A cosmetic pulse would clear the bar now and be deleted
+the moment the real mechanism wanted the same pixels.
+
+Phase 3 closed on 2026-09-24 with no fails in groups A or B, two partials, and this one
+criterion carried — recorded rather than quietly marked passing. See
+[`docs/quality-gates.md`](docs/quality-gates.md).
 
 ### The two gates that matter
 

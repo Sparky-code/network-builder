@@ -149,27 +149,33 @@ Assessed against the above, as built:
 | A2 | Before and after visible together | pass — ghost trace behind the current series, plus per-contribution deltas |
 | A3 | Dominant cost stated | pass — the waterfall caption names it |
 | A4 | Wrong theories die fast | pass* — the caption names which contribution moved most, and by how much |
-| B1 | Saturation is a visible event | pass* — a shockwave on the canvas at the transition, sustained alarm state after |
+| B1 | Saturation is a visible event | **pass** — playtested. Named events in a live feed, plus `OVERLOADED` / `REFUSING 220/s` on the node. A shockwave alone was not legible; words were |
 | B2 | Queues have visible depth | pass — queue tank tracks the integrator; fills over 1.5s, drains over 4.0s |
 | B3 | Dropped requests legible | pass* — refused at the door and deflected away, marked with a cross |
 | B4 | Recovery is felt | pass — playback resolves and holds; drain animates 2.67× longer than build |
-| C1 | Placement is direct | **fail** — palette click drops at a fixed coordinate |
-| C2 | Wiring is forgiving | pass — as of the disconnect fix |
+| C1 | Placement is direct | pass* — dragged from the palette to the point you drop it; clicking still works and finds clear space |
+| C2 | Wiring is forgiving | **pass** — playtested, on the second attempt. The first control was permanently half-visible and too small to aim at |
 | C3 | Refusals teach | partial — the message exists but appears in a toast, away from the gesture |
-| D1 | Running is a moment | **fail** — numbers simply appear |
+| D1 | Running is a moment | **pass** — playtested, "this has a good beat". The run reveals left to right instead of appearing complete |
 | D2 | Canvas alive between runs | **fail** — static and dead until a run |
 | D3 | Iteration is unpunished | pass |
-| E1 | Counterintuitive result lands | partial — the delta makes the gap visible, but nothing remarks on it |
-| E2 | Surprise explained where felt | **fail** |
-| F1 | Passing is an event | **fail** — a list item changes |
+| E1 | Counterintuitive result lands | **pass** — playtested. 99ms against 121ms in a table, immediately after building one of the two |
+| E2 | Surprise explained where felt | **pass** — playtested. The unbuilt shape is measured against yours at completion, with per-row winners |
+| F1 | Passing is an event | **pass** — playtested, "good for now". Three stars surfaces a Complete action; accepting it shows the result |
 | F2 | Partial credit reads as progress | partial |
-| F3 | Reason to try again | **fail** |
+| F3 | Reason to try again | **pass** — playtested. Best cost is recorded and shown as a figure to beat |
 
 **Originally: eleven fails, six partials, three passes.** Nine of the eleven needed
 mechanism that did not exist, which is why no amount of restyling moved it.
 
-**Now: five fails, four partials, nine passes.** Groups A and B are clear, which is the
-stated bar for closing the phase.
+**Now, after two playtests: one fail, two partials, fifteen passes.** Groups A and B are
+clear, and thirteen rows are confirmed by someone actually playing rather than by the code
+existing.
+
+The two playtests are the reason this is worth trusting. The first demoted **B1** and
+**C2** from `pass*` back to fail — the saturation shockwave was not legible, and the
+disconnect control was unusable — and both had to be rebuilt. Mechanism-verified was not
+the same as working, exactly as this document predicted.
 
 Rows marked `pass*` are **mechanism-verified but not playtested.** The mechanism exists and
 behaves as specified — a delta is computed and shown, a shockwave fires on the transition,
@@ -177,9 +183,45 @@ a refused request is deflected at the door. Whether those *read* as intended is 
 five-minute playtest decides, and these are the rows to watch during it. A criterion is not
 closed because the code is there; that is the mistake this document exists to prevent.
 
-What remains, all of it outside groups A and B: C1 (direct placement), D1 (running is a
-moment), D2 (a live canvas between runs), E2 (the surprise explained where it is felt), F1
-and F3 (passing as an event, and a reason to try again).
+What remains:
+
+- **D2 — the canvas is dead between runs.** Nothing moves until traffic is sent, so an idle
+  topology reads as a finished diagram rather than as a system waiting to be changed.
+
+### Phase 3 is closed, with one criterion carried forward
+
+**Decided 2026-09-24.** No fails in group A or B, two partials, one fail outside A and B.
+The phase closes; **D2 is carried into Phase 4** as a known, named gap rather than quietly
+marked passing.
+
+The reasoning for carrying it rather than fixing it: D2 asks that an idle topology read as a
+system that happens to be quiet rather than as a saved diagram. The honest version of that is
+**background load** — a baseline running at a rate the topology handles comfortably, with
+`Send traffic` becoming "show me the peak" rather than "start the world". That is the load
+envelope already scheduled for Phase 4, and it is what gives idle motion a *meaning*.
+
+A cosmetic fix — a slow pulse on the wires, drifting dots — would technically clear the bar
+and would then have to be torn out when the real mechanism arrived and wanted the same
+pixels. Passing a criterion with work you know you will delete is worse than recording the
+gap.
+
+The bar itself was looser than it read: *"no fails in group A or B, and at most two partials
+overall"* permits any number of fails outside A and B, which was a drafting error rather than
+a judgement. It is left as written rather than tightened after seeing the score — moving a
+goalpost once the ball is in the air is the exact failure this document exists to prevent.
+The next phase's gate should say what it means the first time.
+
+### What two playtests were worth
+
+Worth recording, because it is the argument for the whole document. Scored from the code
+alone, this phase looked finished twice before it was:
+
+- The first scoring, from mechanism, put eleven criteria at fail and claimed six `pass*`.
+- The first playtest **demoted B1 and C2 back to fail** — the saturation shockwave was not
+  legible, and the disconnect control was too small to aim at. Both were rebuilt.
+- The second playtest confirmed seven rows, and found a slider that stuck to the cursor.
+
+Every one of those was invisible to the test suite, which was green throughout.
 
 ### What the gate implies about sequencing
 
