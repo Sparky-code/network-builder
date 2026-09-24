@@ -1,13 +1,28 @@
 name: CI
 
+# Every push is checked, on every branch.
+#
+# Restricting this to `main` meant a branch pushed without a PR was verified by
+# nobody, while reading as finished from the branch you were standing on - clean
+# tree, in sync with its remote, green locally. That has now happened here three
+# times in different forms, so the trigger is the thing to fix rather than the
+# discipline.
+#
+# Tags are excluded: they point at commits that were already checked when pushed.
 on:
   push:
-    branches: [main]
+    tags-ignore: ['**']
   pull_request:
 
 # A superseded run has nothing useful left to say. Cancel it.
+#
+# Grouping by head ref rather than by `github.ref` is deliberate: a push and the
+# pull_request event for the same branch would otherwise land in different groups
+# and both run. Sharing a group means the pull_request run - which tests the
+# merge result, not just the branch tip, and is therefore the more useful of the
+# two - supersedes the push run.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 # Least privilege: this workflow only ever reads the repository.
