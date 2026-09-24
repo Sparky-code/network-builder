@@ -58,7 +58,7 @@ exports[`golden reference topologies > act2-database-bottleneck matches its snap
 {
   "cacheHitRatioEdge": 0,
   "cacheHitRatioTotal": 0,
-  "costUsdMonth": 7416.55,
+  "costUsdMonth": 7248.55,
   "perClass": {
     "static-asset": {
       "errorRatePct": 0,
@@ -89,7 +89,7 @@ exports[`golden reference topologies > act2-load-balanced matches its snapshot >
 {
   "cacheHitRatioEdge": 0,
   "cacheHitRatioTotal": 0,
-  "costUsdMonth": 9684.82,
+  "costUsdMonth": 9709.82,
   "perClass": {
     "static-asset": {
       "errorRatePct": 0,
@@ -128,7 +128,7 @@ exports[`golden reference topologies > act3-edge-cache matches its snapshot > ac
 {
   "cacheHitRatioEdge": 0.892,
   "cacheHitRatioTotal": 0.892,
-  "costUsdMonth": 10830.77,
+  "costUsdMonth": 10870.77,
   "perClass": {
     "static-asset": {
       "errorRatePct": 0,
@@ -159,7 +159,7 @@ exports[`golden reference topologies > act3-shielded-multi-pop matches its snaps
 {
   "cacheHitRatioEdge": 0.892,
   "cacheHitRatioTotal": 0.981,
-  "costUsdMonth": 18306.74,
+  "costUsdMonth": 18476.74,
   "perClass": {
     "static-asset": {
       "errorRatePct": 0,

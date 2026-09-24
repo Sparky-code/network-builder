@@ -251,7 +251,12 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
       const { result: r, playhead: ph } = runRef.current;
       const frameData = r !== null && ph >= 0 ? r.frames[ph] : undefined;
 
-      if (frameData !== undefined && !reduceMotion) {
+      // A finished run stops moving. Packets that keep streaming after playback
+      // ends read as a system still under load, when in fact the run is over -
+      // the wire settles instead, and the edge turns solid.
+      const finished = r !== null && ph >= r.frames.length - 1;
+
+      if (frameData !== undefined && !reduceMotion && !finished) {
         const offered = frameData.completedRps;
         const dropFraction = frameData.offeredRps > 0
           ? (frameData.droppedRps + frameData.erroredRps) / frameData.offeredRps
@@ -407,6 +412,17 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
             ? Math.min(1, peakVal / limit) : 0;
           el.style.setProperty('--backlog-frac', String(backlogFrac));
           el.style.setProperty('--backlog-peak-frac', String(peakFrac));
+          // Name the state on the node itself, in words.
+          const statusEl = el.querySelector<HTMLElement>('.station-status');
+          if (statusEl !== null) {
+            const util = st?.utilization ?? 0;
+            statusEl.textContent = (st?.droppedRps ?? 0) > 0
+              ? `REFUSING ${Math.round(st?.droppedRps ?? 0)}/s`
+              : util >= 1 ? 'OVERLOADED'
+                : (st?.backlogReqs ?? 0) > 0.5 ? 'CATCHING UP'
+                  : '';
+          }
+
           el.dataset['queueState'] = (st?.droppedRps ?? 0) > 0
             ? 'shedding' : backlog > 0 ? 'queued' : 'idle';
 
@@ -424,6 +440,8 @@ export function PacketOverlay({ topology, positions, result, playhead }: Props) 
           el.style.setProperty('--backlog-peak-frac', '0');
           el.dataset['saturated'] = 'false';
           el.dataset['queueState'] = 'idle';
+          const statusEl = el.querySelector<HTMLElement>('.station-status');
+          if (statusEl !== null) statusEl.textContent = '';
           const countEl = el.querySelector<HTMLElement>('.station-queue-count');
           if (countEl !== null) countEl.textContent = '';
         }

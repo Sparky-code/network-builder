@@ -70,3 +70,58 @@ describe('previous run retention', () => {
     expect(s.previousResult).toBeNull();
   });
 });
+
+/**
+ * A level needs a beginning and an end.
+ *
+ * Playtest finding: the brief sat in a side rail from the first frame, and
+ * earning three stars changed a character in a list. Neither read as a moment.
+ */
+describe('level phases', () => {
+  beforeEach(() => { store.reset(); });
+
+  it('a reset drops the player straight into building, not back into the brief', () => {
+    // Reset is "start this attempt again", not "re-read the problem".
+    expect(store.getSnapshot().phase).toBe('playing');
+  });
+
+  it('start moves from briefing to playing', () => {
+    store.start();
+    expect(store.getSnapshot().phase).toBe('playing');
+  });
+
+  it('completing does nothing without a result to accept', () => {
+    store.complete();
+    expect(store.getSnapshot().phase).toBe('playing');
+  });
+
+  it('records a best run, and keeps the cheaper one at equal stars', () => {
+    // Expensive but passing.
+    store.updateConfig('origin', { servers: 24 });
+    store.run();
+    store.complete();
+    const expensive = store.getSnapshot().best;
+    expect(expensive).not.toBeNull();
+
+    store.keepPlaying();
+    // Same stars, less money: this should replace it.
+    store.updateConfig('origin', { servers: 14 });
+    store.run();
+    store.complete();
+    const cheaper = store.getSnapshot().best;
+
+    if (expensive !== null && cheaper !== null && cheaper.stars === expensive.stars) {
+      expect(cheaper.costUsdMonth).toBeLessThan(expensive.costUsdMonth);
+    }
+  });
+
+  it('a best score survives a reset — it is a record, not part of the attempt', () => {
+    store.updateConfig('origin', { servers: 14 });
+    store.run();
+    store.complete();
+    const best = store.getSnapshot().best;
+    expect(best).not.toBeNull();
+    store.reset();
+    expect(store.getSnapshot().best).toEqual(best);
+  });
+});

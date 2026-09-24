@@ -18,6 +18,85 @@ Star grading throughout: ★ SLO met · ★★ under budget · ★★★ survive
 
 ---
 
+## Hints are derived, not written — a Phase 4 requirement for every chapter
+
+The prototype level carried one hand-authored hint string, rendered identically whether the
+player had four slots or forty, had built a load balancer or nothing, had run once or never.
+It was not advice about their situation; it was a note the author left for everyone at once.
+
+It was also **wrong from the day it shipped** — it named fifteen slots when the reference
+solution needs fourteen — and stayed wrong until a retune happened to touch the line.
+Nothing caught it, because nothing checked it.
+
+That is the problem worth fixing at the root. This project's central discipline is that
+prose making a checkable claim gets checked: `demonstrations` assert each lesson's claim,
+`explains` bindings are verified against the metric registry, reference solutions must pass
+and `knownBad` must fail. A static hint sits outside all of it while making exactly the kind
+of claim that harness exists to police.
+
+**From Phase 4 onward, every level in every act carries derived hints.**
+
+### The rule
+
+A hint is a **function of the player's current state**, not a string. It reads the same data
+the grader reads — `RunResult.perNode`, `perClass`, `cost`, and the topology `Diagnostic`
+list — so it cannot disagree with the run in front of the player, and it cannot go stale
+when a level is retuned.
+
+`defineLevel` gains a `hints` array. Each entry is a condition plus a line, evaluated in
+order against the live state; the first match is what the player is offered.
+
+```ts
+hints: [
+  { when: 'no-run-yet',
+    say: 'Send traffic first. You cannot fix what you have not measured.' },
+  { when: ({ node }) => node('origin').utilization > 1,
+    say: ({ node }) => `The origin needs ${node('origin').offeredRps} rps during the peak `
+                     + `and has ${node('origin').capacityRps}.` },
+  { when: 'slo-met-but-spof',
+    say: 'Fast enough. Now: what happens when that machine dies?' },
+  { when: 'over-budget',
+    say: 'You are paying for headroom you never use.' },
+  { when: 'passing-above-best',
+    say: ({ best }) => `Solved, at $${best.costUsdMonth}. It can be done for less.` },
+]
+```
+
+### The ladder
+
+Because the system knows which rung a player is on, a hint can escalate rather than arriving
+at full strength. Three levels, requested one at a time:
+
+1. **Nudge** — names *where* to look, not what to do. *"The origin is the constraint."*
+2. **Specific** — names the quantity and the gap. *"It needs 620 rps during the peak and has
+   400."*
+3. **Answer** — names the move. *"Fourteen slots clears it, or three origins of five behind
+   a load balancer."*
+
+A player who asks once should not be handed the solution; a player who asks three times has
+earned it. Hints remain free — tracking or costing them is a separate decision, deliberately
+deferred until the curriculum is long enough for it to mean something.
+
+### What stays authored
+
+One line per level: the **conceptual** claim, which is about the domain rather than about
+the player's topology — *"pooling beats partitioning; what splitting buys you is surviving a
+machine."* That is genuinely authored content and cannot be derived.
+
+But it is still a claim, so it carries a `demonstrations`-style assertion like any other. If
+a balance change ever makes pooling stop beating partitioning, CI fails by name rather than
+letting the sentence quietly become false.
+
+### Why this is Phase 4 and not now
+
+`defineLevel` does not exist yet. Adding a `hints` field before 41 levels are authored costs
+a schema field; retrofitting it across 41 authored levels costs 41 edits and a migration.
+The same argument applies to the `osiLayer` tag and the per-window grading the load-envelope
+work introduces — all three are cheap while the content harness is being built and expensive
+immediately afterwards.
+
+---
+
 ## Act I — The Request
 
 Four levels, one origin, no distractions. The player learns to read a request before they
