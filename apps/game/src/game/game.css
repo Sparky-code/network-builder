@@ -986,7 +986,52 @@
 }
 
 .station-stepper { display: flex; align-items: center; gap: var(--space-2); }
-.station-stepper input[type="range"] { flex: 1; min-width: 0; accent-color: var(--color-primary); }
+/*
+ * A thin track with a circular thumb. The default control is heavy enough to
+ * dominate a 232px panel, and this is a fine adjustment rather than the
+ * panel's subject.
+ */
+.station-stepper input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.station-stepper input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+}
+.station-stepper input[type="range"]::-moz-range-track {
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+}
+.station-stepper input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--elevation-1);
+}
+.station-stepper input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: var(--elevation-1);
+}
+.station-stepper input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 .station-stepper button {
   display: grid;
   place-items: center;
@@ -1303,3 +1348,7 @@
   color: var(--color-success);
   font-weight: var(--type-label-large-weight);
 }
+
+/* A palette item is a thing you pick up, and should say so. */
+.palette-item { cursor: grab; }
+.palette-item:active { cursor: grabbing; }

@@ -81,7 +81,18 @@ function StationControls({ id, data }: { id: string; data: StationNodeData }) {
     };
   }, [open]);
 
-  // React Flow starts a node drag on pointer down, which swallows the click.
+  /*
+   * React Flow starts a node drag on pointer down.
+   *
+   * `nodrag` is its own opt-out and is the right tool: stopping propagation
+   * also interfered with the range input's native pointer capture, so the
+   * thumb kept following the cursor after release. The class suppresses the
+   * drag without touching the event, which leaves the browser's own slider
+   * behaviour intact.
+   *
+   * Buttons still stop propagation, since a click there should not also reach
+   * the canvas beneath.
+   */
   const stop = {
     onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
     onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
@@ -93,7 +104,7 @@ function StationControls({ id, data }: { id: string; data: StationNodeData }) {
   if (!editable) return null;
 
   return (
-    <div className="station-gear-wrap" ref={wrapRef} {...stop}>
+    <div className="station-gear-wrap nodrag" ref={wrapRef} {...stop}>
       <button
         type="button"
         className="station-gear"
@@ -114,7 +125,7 @@ function StationControls({ id, data }: { id: string; data: StationNodeData }) {
       </button>
 
       {open && (
-        <div className="station-panel" role="group" aria-label={`${data.type.label} settings`}>
+        <div className="station-panel nodrag" role="group" aria-label={`${data.type.label} settings`}>
           {data.servers !== null && (
             <div className="station-field">
               <span className="station-field-label">
@@ -129,9 +140,9 @@ function StationControls({ id, data }: { id: string; data: StationNodeData }) {
                   <Minus size={13} strokeWidth={2.4} />
                 </button>
                 <input
+                  className="nodrag"
                   type="range" min={1} max={32} value={data.servers}
                   aria-label="Service slots"
-                  {...stop}
                   onChange={(e) => setServers(Number(e.target.value))}
                 />
                 <button
