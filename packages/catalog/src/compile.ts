@@ -80,6 +80,8 @@ export function compile(
         ? servers * template.queueLimitPerServer
         : Number.POSITIVE_INFINITY,
       cryptoCpuMs: template.cryptoCpuMs ?? 0,
+      costPerServerMonth: type.cost.usdPerServerMonth,
+      costFixedMonth: type.cost.usdFixedMonth,
       ...(template.admission !== undefined ? { admission: template.admission } : {}),
       routing,
     }));

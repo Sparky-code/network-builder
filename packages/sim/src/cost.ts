@@ -46,18 +46,36 @@ export function computeCost(
   agg: CostAggregates,
   rates: CostRates = DEFAULT_COST_RATES,
 ): CostBreakdown {
-  let servers = 0;
+  /*
+   * Each station is charged what it declares.
+   *
+   * This previously applied one flat per-server rate to every station and
+   * ignored the catalog's cost specs entirely, which made a load balancer,
+   * a CDN PoP and an origin shield all free - so no level could ever teach
+   * whether a shield was worth paying for. The origin was correct only by
+   * coincidence, its price happening to match the global default.
+   *
+   * `usdPerServerMonth` on the rate card is now a fallback for stations that
+   * declare no price of their own, so a bare `makeStation` still bills.
+   */
+  let computeUsdMonth = 0;
   for (const id of [...stations.keys()].sort()) {
-    const n = stations.get(id)?.servers ?? 0;
-    // Infinite-server stations are traffic sources and clients, not capacity
-    // anyone pays for. Summing them yields a bill of Infinity.
-    if (Number.isFinite(n)) servers += n;
+    const st = stations.get(id);
+    if (st === undefined) continue;
+    // Infinite-server stations are traffic sources and pass-through tiers, not
+    // capacity anyone pays for by the slot. They can still carry a fixed fee.
+    if (Number.isFinite(st.servers)) {
+      const perServer = st.costPerServerMonth > 0
+        ? st.costPerServerMonth
+        : rates.usdPerServerMonth;
+      computeUsdMonth += st.servers * perServer;
+    }
+    computeUsdMonth += st.costFixedMonth;
   }
 
   // Scale the measured window up to a month.
   const scale = agg.simulatedSeconds > 0 ? SECONDS_PER_MONTH / agg.simulatedSeconds : 0;
 
-  const computeUsdMonth = servers * rates.usdPerServerMonth;
   const egressUsdMonth =
     ((agg.edgeEgressBytes / BYTES_PER_GB) * rates.usdPerGbEdge +
       (agg.originEgressBytes / BYTES_PER_GB) * rates.usdPerGbOrigin) *

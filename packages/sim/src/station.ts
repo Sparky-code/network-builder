@@ -63,6 +63,14 @@ export interface Station {
   /** CPU charged per handshake this station terminates. */
   readonly cryptoCpuMs: number;
 
+  /*
+   * What this station costs to run. Set by the catalog from its component
+   * type, because pricing is a game concept and the engine does not know what
+   * a load balancer is - it only knows that a station has a price.
+   */
+  readonly costPerServerMonth: number;
+  readonly costFixedMonth: number;
+
   readonly admission: readonly AdmissionSpec[];
   readonly routing: RoutingSpec;
   readonly controllers: readonly ControllerSpec[];
@@ -100,6 +108,8 @@ export function makeStation(init: {
   serviceCv2?: number;
   queueLimit?: number;
   cryptoCpuMs?: number;
+  costPerServerMonth?: number;
+  costFixedMonth?: number;
   admission?: readonly AdmissionSpec[];
   routing?: RoutingSpec;
   controllers?: readonly ControllerSpec[];
@@ -112,6 +122,8 @@ export function makeStation(init: {
     serviceCv2: init.serviceCv2 ?? 0.5,
     queueLimit: init.queueLimit ?? Number.POSITIVE_INFINITY,
     cryptoCpuMs: init.cryptoCpuMs ?? 0,
+    costPerServerMonth: init.costPerServerMonth ?? 0,
+    costFixedMonth: init.costFixedMonth ?? 0,
     admission: init.admission ?? [{ kind: 'none' }],
     routing: init.routing ?? { kind: 'terminal' },
     controllers: init.controllers ?? [],
