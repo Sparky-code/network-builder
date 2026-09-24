@@ -19,7 +19,26 @@ import { LEVEL } from './level';
 
 export interface Position { x: number; y: number }
 
+/**
+ * Where the player is in the level.
+ *
+ * Playtest findings: the brief sat in a side rail from the first frame, so
+ * there was no moment of being given a problem; and earning three stars changed
+ * a character in a list, so there was no moment of having solved it. A level
+ * needs a beginning and an end, not just a middle.
+ */
+export type LevelPhase = 'briefing' | 'playing' | 'complete';
+
+/** Best result so far, so a solved level still has something to beat. */
+export interface BestRun {
+  readonly stars: number;
+  readonly p99Ms: number;
+  readonly costUsdMonth: number;
+}
+
 export interface GameState {
+  readonly phase: LevelPhase;
+  readonly best: BestRun | null;
   readonly topology: Topology;
   readonly positions: Readonly<Record<string, Position>>;
   readonly selected: string | null;
@@ -47,9 +66,13 @@ const STARTING_POSITIONS: Record<string, Position> = {
   origin: { x: 420, y: 180 },
 };
 
-function initialState(): GameState {
+function initialState(best: BestRun | null = null): GameState {
   const topology = LEVEL.startingTopology;
   return {
+    phase: 'briefing',
+    // A best score survives a reset: it is a record of what the player has
+    // achieved, not part of the attempt they just abandoned.
+    best,
     topology,
     positions: { ...STARTING_POSITIONS },
     selected: null,
@@ -96,9 +119,33 @@ class Store {
   }
 
   reset = (): void => {
-    this.state = initialState();
+    this.state = { ...initialState(this.state.best), phase: 'playing' };
     for (const l of this.listeners) l();
   };
+
+  /** The brief has been read. Play begins. */
+  start = (): void => this.set({ phase: 'playing' });
+
+  /** Accept the result and close the level out. */
+  complete = (): void => {
+    const g = grade(this.state);
+    const m = this.state.result?.perClass['api-read'];
+    const cost = this.state.result?.cost.totalUsdMonth;
+    if (g === null || m === undefined || cost === undefined) return;
+
+    const candidate: BestRun = { stars: g.stars, p99Ms: m.p99Ms, costUsdMonth: cost };
+    const prior = this.state.best;
+    // Better means more stars, or the same stars for less money - which is the
+    // axis the level actually asks the player to optimise.
+    const improved = prior === null
+      || candidate.stars > prior.stars
+      || (candidate.stars === prior.stars && candidate.costUsdMonth < prior.costUsdMonth);
+
+    this.set({ phase: 'complete', best: improved ? candidate : prior });
+  };
+
+  /** Back to building, keeping the topology and the best score. */
+  keepPlaying = (): void => this.set({ phase: 'playing' });
 
   select = (id: string | null): void => this.set({ selected: id });
 
