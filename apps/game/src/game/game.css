@@ -94,10 +94,27 @@
 .muted { color: var(--color-text-muted); }
 
 .brief-text { line-height: var(--type-body-large-line-height); }
-.hint {
+/* A disclosure, not a paragraph: the hint is available, not present. */
+.hint { font-size: var(--type-label-medium-size); }
+.hint > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  list-style: none;
+  padding: var(--space-2) 0;
+  user-select: none;
+}
+.hint > summary::-webkit-details-marker { display: none; }
+.hint > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: rotate var(--duration-fast) var(--easing-standard);
+}
+.hint[open] > summary::before { rotate: 90deg; }
+.hint > summary:hover { color: var(--color-text); }
+.hint > p {
+  margin: 0;
   border-left: 2px solid var(--color-border);
   padding-left: var(--space-3);
-  font-size: var(--type-label-medium-size);
   line-height: var(--type-body-medium-line-height);
 }
 
@@ -203,7 +220,12 @@
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   box-shadow: var(--elevation-2);
-  overflow: hidden;
+  /*
+   * Not `overflow: hidden`. That clipped the settings panel to the 208x66 box,
+   * which made it unreadable. The two children that used to rely on the clip -
+   * the tier rail and the load bar - now carry matching corner radii instead.
+   */
+  overflow: visible;
   transition: box-shadow var(--duration-fast) var(--easing-standard);
 }
 
@@ -214,6 +236,8 @@
   inset: 0 auto 0 0;
   width: 3px;
   background: var(--color-primary);
+  /* Own its corners, now that the parent no longer clips. */
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 .station[data-tier="origin"]::before { background: var(--color-warning); }
 
@@ -284,6 +308,8 @@
   inset: auto 0 0 0;
   height: 3px;
   background: var(--surface-sunken);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  overflow: hidden;
 }
 .station-load-fill {
   height: 100%;
@@ -417,32 +443,47 @@
  * discoverable is the whole point; the previous version could only be found by
  * knowing Backspace worked.
  */
-.edge-actions {
+/*
+ * Nothing is drawn on a wire until you approach it. A control that is always
+ * half-present reads as decoration and clutters the diagram; one that appears
+ * on approach is discoverable without being noise.
+ */
+.edge-control {
   position: absolute;
   pointer-events: all;
-  opacity: 0.45;
-  transform-origin: center;
+  opacity: 0;
+  scale: 0.9;
   transition:
     opacity var(--duration-fast) var(--easing-standard),
     scale var(--duration-fast) var(--easing-standard);
-  scale: 0.72;
 }
-.edge-actions:hover,
-.edge-actions[data-selected="true"] { opacity: 1; scale: 1; }
+.edge-control[data-shown="true"] { opacity: 1; scale: 1; }
+/* Keep it clickable while fading, so a fast diagonal approach still lands. */
+.edge-control[data-shown="false"] { pointer-events: none; }
 
-.edge-delete {
+.edge-disconnect {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  background: var(--surface-raised);
-  color: var(--color-danger);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  box-shadow: var(--elevation-2);
+  border-radius: var(--radius-full);
+  box-shadow: var(--elevation-3);
   cursor: pointer;
 }
-.edge-delete:hover { background: var(--color-danger); color: var(--color-on-primary); }
+.edge-disconnect:hover {
+  color: var(--color-on-primary);
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* The wire itself brightens on approach, so the target is obvious before the
+   pointer arrives. */
+.traffic-edge[data-armed="true"] { stroke: var(--color-primary); }
 
 .packet-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 
@@ -727,4 +768,538 @@
 .station[data-queue-state="shedding"] {
   border-color: var(--color-alarm);
   box-shadow: 0 0 0 1px var(--color-alarm), var(--elevation-3);
+}
+
+/* The leading tip of a run still in progress, so the eye has something to follow. */
+.sparkline-head[data-live="true"] {
+  fill: var(--color-primary);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+
+/* ---------------------------------------------------------- event feed */
+
+.feed { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* The whole run's record, scrolled rather than truncated. */
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.feed-list li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  border-left: 2px solid var(--color-border);
+  font-size: var(--type-label-medium-size);
+  line-height: var(--type-body-medium-line-height);
+}
+.feed-list li[data-sev="alarm"] { border-left-color: var(--color-alarm); }
+.feed-list li[data-sev="warning"] { border-left-color: var(--color-warning); }
+
+.feed-icon { display: grid; place-items: center; height: 18px; }
+.feed-list li[data-sev="alarm"] .feed-icon { color: var(--color-alarm); }
+.feed-list li[data-sev="warning"] .feed-icon { color: var(--color-warning); }
+.feed-list li[data-sev="info"] .feed-icon { color: var(--color-text-muted); }
+
+.feed-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  min-width: 34px;
+}
+.feed-body { min-width: 0; }
+
+/*
+ * The station names its own state. Empty when healthy, so a calm topology stays
+ * quiet and an unhealthy one is impossible to misread.
+ */
+.station-status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  text-align: center;
+  font-size: 9px;
+  font-weight: var(--type-label-large-weight);
+  letter-spacing: 0.09em;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.station-status:empty { display: none; }
+.station[data-queue-state="shedding"] .station-status { color: var(--color-alarm); }
+.station[data-saturated="true"] .station-status { color: var(--color-warning); }
+
+/* ------------------------------------------------------------- modals */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: color-mix(in oklab, var(--color-background) 72%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - var(--space-8));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-5);
+}
+
+.modal h2 {
+  margin: 0;
+  font-size: var(--type-headline-medium-size);
+  line-height: var(--type-headline-medium-line-height);
+  letter-spacing: -0.02em;
+}
+
+.modal-objectives { margin-top: var(--space-2); }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.modal-trophy {
+  display: grid;
+  place-items: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+
+.modal-stars { font-size: var(--type-display-large-size); line-height: 1; }
+
+.modal-figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+.modal-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.modal-figures strong {
+  font-size: var(--type-title-medium-size);
+  font-variant-numeric: tabular-nums;
+}
+.modal-figures .muted {
+  font-size: var(--type-label-medium-size);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Earning the third star is an event, so the way out is impossible to miss. */
+.complete-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-weight: var(--type-label-large-weight);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-on-primary);
+  background: var(--color-success);
+  border: 1px solid var(--color-success);
+  box-shadow: var(--elevation-2);
+}
+.complete-button:hover { filter: brightness(1.06); }
+
+/* -------------------------------------------------- controls on a block */
+
+/*
+ * The gear is always visible, because a control nobody knows exists is not a
+ * control. The panel it opens stays out of the diagram until asked for.
+ */
+.station-gear-wrap { position: absolute; top: var(--space-1); right: var(--space-1); z-index: 4; }
+
+.station-gear {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity var(--duration-fast) var(--easing-standard);
+}
+.station:hover .station-gear, .station-gear[aria-expanded="true"] { opacity: 1; }
+.station-gear:hover { color: var(--color-text); background: var(--surface-sunken); }
+
+.station-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-4);
+  cursor: default;
+}
+
+.station-field { display: flex; flex-direction: column; gap: var(--space-2); }
+.station-field-label {
+  font-size: var(--type-label-medium-size);
+  font-weight: var(--type-label-large-weight);
+}
+
+.station-stepper { display: flex; align-items: center; gap: var(--space-2); }
+.station-stepper input[type="range"] { flex: 1; min-width: 0; accent-color: var(--color-primary); }
+.station-stepper button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.station-stepper button:hover:not(:disabled) { color: var(--color-text); }
+.station-stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+.station-stepper-value {
+  min-width: 20px;
+  text-align: right;
+  font-size: var(--type-label-medium-size);
+  font-weight: var(--type-label-large-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.station-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  font: inherit;
+  font-size: var(--type-label-medium-size);
+  color: var(--color-danger);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--color-danger) 40%, transparent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.station-remove:hover {
+  color: var(--color-on-primary);
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------- hints */
+
+.hint-ask {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  font: inherit;
+  font-size: var(--type-label-medium-size);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.hint-ask:hover { color: var(--color-text); border-style: solid; background: var(--surface-sunken); }
+
+.hint-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.hint-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-label-medium-size);
+  line-height: var(--type-body-medium-line-height);
+}
+.hint-rung {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--type-label-large-weight);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------- modals */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: color-mix(in oklab, var(--color-background) 72%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - var(--space-8));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-5);
+}
+
+.modal h2 {
+  margin: 0;
+  font-size: var(--type-headline-medium-size);
+  line-height: var(--type-headline-medium-line-height);
+  letter-spacing: -0.02em;
+}
+
+.modal-objectives { margin-top: var(--space-2); }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.modal-trophy {
+  display: grid;
+  place-items: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+
+.modal-stars { font-size: var(--type-display-large-size); line-height: 1; }
+
+.modal-figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+.modal-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.modal-figures strong {
+  font-size: var(--type-title-medium-size);
+  font-variant-numeric: tabular-nums;
+}
+.modal-figures .muted {
+  font-size: var(--type-label-medium-size);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Earning the third star is an event, so the way out is impossible to miss. */
+.complete-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-weight: var(--type-label-large-weight);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-on-primary);
+  background: var(--color-success);
+  border: 1px solid var(--color-success);
+  box-shadow: var(--elevation-2);
+}
+.complete-button:hover { filter: brightness(1.06); }
+
+/* -------------------------------------------------- controls on a block */
+
+/*
+ * Sits above the box so it never covers the station's own readouts, and clear
+ * of the left/right connection handles so reaching for a control is never
+ * mistaken for starting a wire.
+ */
+.station-controls {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--space-2));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--elevation-3);
+  white-space: nowrap;
+  z-index: 4;
+}
+
+/* A hover bridge, so moving up to the controls does not pass through a gap
+   that would dismiss them. */
+.station-controls::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: var(--space-2);
+}
+
+.station-controls button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.station-controls button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--surface-sunken);
+}
+.station-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.station-stepper { display: flex; align-items: center; gap: 2px; }
+.station-stepper-value {
+  min-width: 22px;
+  text-align: center;
+  font-size: var(--type-label-medium-size);
+  font-weight: var(--type-label-large-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.station-remove { margin-left: var(--space-1); }
+.station-remove:hover {
+  color: var(--color-on-primary) !important;
+  background: var(--color-danger) !important;
+}
+
+/*
+ * A finished run settles the wire. Green only when the run actually passed -
+ * a solid green line over a failing topology would be a lie, so a strained
+ * result settles without the reassurance.
+ */
+.traffic-edge[data-settled="healthy"] {
+  stroke: var(--color-success);
+  stroke-width: 2.5;
+}
+.traffic-edge[data-settled="strained"] {
+  stroke: var(--color-warning);
+  stroke-width: 2.5;
+}
+
+/* The brief is read once and should not be a column of wrapped fragments. */
+.modal-wide { width: min(760px, 100%); }
+
+.objective-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.objective-list li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--type-label-medium-size);
+  white-space: nowrap;
+}
+.objective-list .muted {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.objective-mark { color: var(--color-text-muted); }
+
+/* ------------------------------------------------------- the other way */
+
+.other-way {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-top: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.compare { width: 100%; border-collapse: collapse; font-size: var(--type-label-medium-size); }
+.compare th, .compare td { padding: var(--space-2) var(--space-3); text-align: right; }
+.compare thead th {
+  color: var(--color-text-muted);
+  font-weight: var(--type-label-large-weight);
+  border-bottom: 1px solid var(--color-border);
+}
+.compare tbody th {
+  text-align: left;
+  color: var(--color-text-muted);
+  font-weight: var(--type-body-medium-weight);
+}
+.compare td { font-variant-numeric: tabular-nums; }
+/* Whichever side wins each row, marked per row rather than per column - the
+   point is that neither design wins everything. */
+.compare td[data-better="true"] {
+  color: var(--color-success);
+  font-weight: var(--type-label-large-weight);
 }

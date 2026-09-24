@@ -4,10 +4,11 @@ import {
   type Connection, type Edge, type Node, type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Play, Repeat, RotateCcw, Sun, Moon } from 'lucide-react';
-import { hasErrors } from '@nb/catalog';
+import { Check, Lightbulb, Moon, Play, Repeat, RotateCcw, Sun, Trophy } from 'lucide-react';
+import { CATALOG, compile, hasErrors, validate } from '@nb/catalog';
+import { simulate } from '@nb/sim';
 import { useTheme } from './hooks/use-theme';
-import { grade, nodeTypeOf, store, type GameState } from './game/state';
+import { grade, nodeTypeOf, store, type GameState, type Grade } from './game/state';
 import { LEVEL } from './game/level';
 import { StationNode, type StationNodeData } from './game/StationNode';
 import { TrafficEdge } from './game/TrafficEdge';
@@ -61,8 +62,17 @@ function Canvas({ state }: { state: GameState }) {
       type: 'station',
       position: state.positions[id] ?? { x: 0, y: 0 },
       selected: state.selected === id,
+      // A selected block sits above its neighbours. Without this, opening a
+      // block's settings could render the panel *behind* an adjacent block -
+      // you could see the control you were trying to use, underneath something
+      // else.
+      zIndex: state.selected === id ? 10 : 1,
       data: {
         type: type as NonNullable<typeof type>,
+        servers: typeof n.config['servers'] === 'number' ? n.config['servers'] : null,
+        // A traffic source is where requests come from; removing it leaves
+        // nothing to simulate.
+        removable: (type?.id as string | undefined) !== 'client',
         ...describe(state, id),
         hasError: state.diagnostics.some(
           (d) => d.severity === 'error' && d.nodeIds.includes(id)),
@@ -72,12 +82,19 @@ function Canvas({ state }: { state: GameState }) {
     };
   }), [state]);
 
+  // A finished run settles the wires. Green only when it actually passed -
+  // a solid green line over a failing topology would be a lie.
+  const frameCount = state.result?.frames.length ?? 0;
+  const settled = frameCount > 0 && state.playhead >= frameCount - 1;
+  const healthy = (state.result?.perClass['api-read']?.errorRatePct ?? 100) <= 1;
+
   const edges = useMemo<Edge[]>(() => state.topology.edges.map((e) => ({
     id: e.id as string,
     type: 'traffic',
     source: e.from.nodeId as string,
     target: e.to.nodeId as string,
-  })), [state.topology.edges]);
+    data: { settled, healthy },
+  })), [state.topology.edges, settled, healthy]);
 
   return (
     <ReactFlow
@@ -121,6 +138,210 @@ function Canvas({ state }: { state: GameState }) {
         playhead={state.playhead}
       />
     </ReactFlow>
+  );
+}
+
+/**
+ * Help you ask for, one rung at a time.
+ *
+ * Asked for rather than given, because a hint on screen from the first frame is
+ * the answer with extra steps. Escalating rather than single, because one hint
+ * is either too weak to help or strong enough to finish the level for you.
+ */
+function HintLadder() {
+  const [shown, setShown] = useState(0);
+  const total = LEVEL.hints.length;
+
+  if (shown === 0) {
+    return (
+      <button type="button" className="hint-ask" onClick={() => setShown(1)}>
+        <Lightbulb size={14} strokeWidth={2} />
+        Stuck? Get a hint
+      </button>
+    );
+  }
+
+  return (
+    <div className="hint-stack">
+      {LEVEL.hints.slice(0, shown).map((h, i) => (
+        <p key={i} className="hint-step">
+          <span className="hint-rung">{i + 1}/{total}</span>
+          <span className="muted">{h}</span>
+        </p>
+      ))}
+      {shown < total && (
+        <button type="button" className="hint-ask" onClick={() => setShown(shown + 1)}>
+          <Lightbulb size={14} strokeWidth={2} />
+          Still stuck? Tell me more
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The brief, as a moment rather than a rail.
+ *
+ * A problem you are handed reads differently from one that was always on the
+ * side of the screen. After accepting it the same text stays available in the
+ * left rail, so nothing is lost by dismissing it.
+ */
+function BriefingModal() {
+  return (
+    <div className="scrim" role="dialog" aria-modal="true" aria-labelledby="brief-title">
+      <div className="modal modal-wide">
+        <div className="eyebrow">Act {LEVEL.act} · Level {LEVEL.number}</div>
+        <h2 id="brief-title">{LEVEL.title}</h2>
+        <p className="brief-text">{LEVEL.brief}</p>
+
+        <div className="modal-objectives">
+          <div className="panel-heading">To pass</div>
+          <ul className="objective-list">
+            {LEVEL.objectives.map((o) => (
+              <li key={o.id}>
+                <span className="objective-mark" aria-hidden="true">○</span>
+                <strong>{o.label}</strong>
+                <span className="muted">{o.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="primary-button" onClick={store.start} autoFocus>
+            <Play size={15} strokeWidth={2.4} />
+            Start building
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What the other shape would have done, measured.
+ *
+ * A level whose lesson is a tradeoff teaches only half of it if the player sees
+ * only the half they built. Shown after the attempt rather than during it, and
+ * only for the shape they did not choose - telling someone about the design
+ * they are already looking at is not a reveal.
+ *
+ * The numbers come from running it through the same engine as their own run, so
+ * this is a comparison rather than a claim.
+ */
+function TheOtherWay({ state }: { state: GameState }) {
+  const comparison = useMemo(() => {
+    const mine = state.result?.perClass['api-read'];
+    if (mine === undefined) return null;
+
+    // The shape they did not build is the one worth showing.
+    const other = LEVEL.alternatives.find((a) => !a.matches(state.topology));
+    if (other === undefined) return null;
+
+    const result = simulate({ ...compile(other.topology, CATALOG), scenario: LEVEL.scenario });
+    const theirs = validate(state.topology, CATALOG)
+      .some((d) => d.code === 'single-point-of-failure');
+    const otherSpof = validate(other.topology, CATALOG)
+      .some((d) => d.code === 'single-point-of-failure');
+
+    return {
+      other,
+      mine: { p99: mine.p99Ms, cost: state.result?.cost.totalUsdMonth ?? 0, spof: theirs },
+      theirs: {
+        p99: result.perClass['api-read']?.p99Ms ?? 0,
+        cost: result.cost.totalUsdMonth,
+        spof: otherSpof,
+      },
+    };
+  }, [state.result, state.topology]);
+
+  if (comparison === null) return null;
+  const { other, mine, theirs } = comparison;
+
+  return (
+    <div className="other-way">
+      <div className="panel-heading">The other way</div>
+      <table className="compare">
+        <thead>
+          <tr>
+            <th />
+            <th>What you built</th>
+            <th>{other.label}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">p99</th>
+            <td data-better={mine.p99 <= theirs.p99}>{Math.round(mine.p99)}ms</td>
+            <td data-better={theirs.p99 < mine.p99}>{Math.round(theirs.p99)}ms</td>
+          </tr>
+          <tr>
+            <th scope="row">Cost</th>
+            <td data-better={mine.cost <= theirs.cost}>${Math.round(mine.cost)}</td>
+            <td data-better={theirs.cost < mine.cost}>${Math.round(theirs.cost)}</td>
+          </tr>
+          <tr>
+            <th scope="row">Survives a machine</th>
+            <td data-better={!mine.spof}>{mine.spof ? 'No' : 'Yes'}</td>
+            <td data-better={!theirs.spof}>{theirs.spof ? 'No' : 'Yes'}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="muted">
+        <strong>{other.label}</strong> buys you {other.buys.charAt(0).toLowerCase()}
+        {other.buys.slice(1)} It costs you {other.costsYou.charAt(0).toLowerCase()}
+        {other.costsYou.slice(1)}
+      </p>
+    </div>
+  );
+}
+
+/** Passing is an event, not a character changing colour in a list. */
+function CompleteModal({ state, grading }: { state: GameState; grading: Grade | null }) {
+  const m = state.result?.perClass['api-read'];
+  const cost = state.result?.cost.totalUsdMonth ?? 0;
+  const best = state.best;
+  const beatable = best !== null && best.costUsdMonth < cost;
+
+  return (
+    <div className="scrim" role="dialog" aria-modal="true" aria-labelledby="done-title">
+      <div className="modal modal-wide">
+        <div className="modal-trophy" aria-hidden="true"><Trophy size={22} strokeWidth={1.8} /></div>
+        <div className="eyebrow">Level {LEVEL.number} complete</div>
+        <h2 id="done-title">{LEVEL.title}</h2>
+
+        <div className="grade-stars modal-stars" aria-label={`${grading?.stars ?? 0} of 3`}>
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="grade-star" data-earned={i < (grading?.stars ?? 0)}>★</span>
+          ))}
+        </div>
+
+        <div className="modal-figures">
+          <div><span className="muted">p99</span><strong>{Math.round(m?.p99Ms ?? 0)}ms</strong></div>
+          <div><span className="muted">errors</span><strong>{(m?.errorRatePct ?? 0).toFixed(1)}%</strong></div>
+          <div><span className="muted">cost</span><strong>${Math.round(cost)}/mo</strong></div>
+        </div>
+
+        {/* A solved level still needs something to beat. */}
+        <p className="muted">
+          {best === null || best.costUsdMonth >= cost
+            ? 'This is your cheapest passing design so far. A leaner one exists — the budget is not the floor.'
+            : `Your best so far is $${Math.round(best.costUsdMonth)}/mo${beatable ? '' : ''}. Same stars for less money is the next thing to chase.`}
+        </p>
+
+        <TheOtherWay state={state} />
+
+        <div className="modal-actions">
+          <button type="button" className="ghost-button" onClick={store.keepPlaying}>
+            Keep tuning
+          </button>
+          <button type="button" className="primary-button" onClick={store.keepPlaying}>
+            <Check size={15} strokeWidth={2.4} />
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -195,7 +416,7 @@ export default function App() {
         <section className="panel">
           <div className="panel-heading">The situation</div>
           <p className="brief-text">{LEVEL.brief}</p>
-          <p className="muted hint">{LEVEL.hint}</p>
+          <HintLadder />
         </section>
         <section className="panel">
           <div className="panel-heading">Add a component</div>
@@ -251,6 +472,13 @@ export default function App() {
             </button>
           )}
 
+          {grading !== null && grading.stars === 3 && state.phase === 'playing' && (
+            <button type="button" className="complete-button" onClick={store.complete}>
+              <Trophy size={15} strokeWidth={2.2} />
+              Complete level
+            </button>
+          )}
+
           <div className="runbar-status">
             {blocked
               ? <span className="status status-bad">{errors[0]?.message ?? 'Fix the errors first'}</span>
@@ -264,6 +492,9 @@ export default function App() {
       <aside className="app-right">
         <Hud state={state} grading={grading} />
       </aside>
+
+      {state.phase === 'briefing' && <BriefingModal />}
+      {state.phase === 'complete' && <CompleteModal state={state} grading={grading} />}
 
       {state.lastError !== null && (
         <div className="toast" role="status">

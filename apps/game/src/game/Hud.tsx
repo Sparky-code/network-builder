@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { TriangleAlert } from 'lucide-react';
+import { CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import type { LatencyWaterfall } from '@nb/schema';
 import type { GameState, Grade } from './state';
+import { deriveEvents, eventsUpTo, type RunEvent } from './events';
 import { LEVEL } from './level';
 
 /**
@@ -45,18 +46,39 @@ function Sparkline({ state }: { state: GameState }) {
     // progress through its own run rather than by frame index.
     const xOf = (i: number, n: number): number => (n <= 1 ? 0 : (i / (n - 1)) * w);
     const y = (v: number): number => h - (Math.min(v, peak) / peak) * h;
+    // Used for the previous run, which is always drawn end to end.
     const toPath = (vs: readonly number[]): string =>
       vs.map((v, i) => `${i === 0 ? 'M' : 'L'}${xOf(i, vs.length).toFixed(1)},${y(v).toFixed(1)}`)
         .join(' ');
 
+    /*
+     * The current run is drawn only as far as the playhead.
+     *
+     * Drawing the whole series up front and sliding a dot along it shows the
+     * answer before the run has happened - there is nothing to watch, because
+     * the ending is already on screen. Revealing it turns the chart into the
+     * run rather than a picture of it.
+     *
+     * The previous run is drawn in full: it is history, and it is the thing
+     * being compared against.
+     */
+    const upTo = Math.max(1, Math.min(values.length, state.playhead + 1));
+    const revealed = values.slice(0, upTo);
+
     return {
       w, h,
-      line: toPath(values),
+      // Positioned against the full run so the trace advances across the chart
+      // rather than stretching to fill it.
+      line: revealed
+        .map((v, i) => `${i === 0 ? 'M' : 'L'}${xOf(i, values.length).toFixed(1)},${y(v).toFixed(1)}`)
+        .join(' '),
       ghostLine: ghost.length > 1 ? toPath(ghost) : null,
-      area: `M0,${h} ${values.map((v, i) => `L${xOf(i, values.length).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} L${w},${h} Z`,
+      area: `M0,${h} ${revealed.map((v, i) => `L${xOf(i, values.length).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} L${xOf(upTo - 1, values.length).toFixed(1)},${h} Z`,
       sloY: y(LEVEL.sloP99Ms),
-      headX: xOf(Math.max(0, state.playhead), values.length),
-      headY: y(values[Math.max(0, state.playhead)] ?? 0),
+      headX: xOf(upTo - 1, values.length),
+      headY: y(values[upTo - 1] ?? 0),
+      // The tip leads the trace, so the eye has something to follow.
+      live: upTo < values.length,
     };
   }, [frames, ghostFrames, state.playhead]);
 
@@ -89,7 +111,10 @@ function Sparkline({ state }: { state: GameState }) {
           <path d={path.ghostLine} className="sparkline-ghost" />
         )}
         <path d={path.line} className="sparkline-line" />
-        <circle cx={path.headX} cy={path.headY} r="3.5" className="sparkline-head" />
+        <circle
+          cx={path.headX} cy={path.headY} r={path.live ? 4 : 3.5}
+          className="sparkline-head" data-live={path.live}
+        />
       </svg>
     </div>
   );
@@ -231,6 +256,58 @@ function Waterfall({ state }: { state: GameState }) {
   );
 }
 
+/**
+ * What is happening, narrated as it happens.
+ *
+ * Playtest finding: a player could see something going wrong at the origin
+ * without being able to say what. Colour and shape can signal that a state
+ * exists; only words can say which one, when it began, and how bad it is.
+ *
+ * Reveals in step with the playhead, so reading it is watching the run rather
+ * than reading its summary afterwards.
+ */
+function EventFeed({ state }: { state: GameState }) {
+  const all = useMemo(
+    () => (state.result === null ? [] : deriveEvents(state.result)),
+    [state.result],
+  );
+  if (all.length === 0) return null;
+
+  // Newest first, and all of them: the feed is the record of the run, so
+  // truncating it throws away the beginning of the story. The list scrolls.
+  const seen = eventsUpTo(all, state.playhead);
+  const shown = [...seen].reverse();
+  if (shown.length === 0) return null;
+
+  const icon = (e: RunEvent) =>
+    e.severity === 'alarm' ? <CircleAlert size={13} strokeWidth={2.2} />
+      : e.severity === 'warning' ? <TriangleAlert size={13} strokeWidth={2.2} />
+        : <Info size={13} strokeWidth={2.2} />;
+
+  return (
+    <div className="feed" aria-live="polite">
+      <div className="chart-head">
+        <span className="chart-title">What happened</span>
+        <span className="chart-note">{seen.length} of {all.length}</span>
+      </div>
+      <ul className="feed-list">
+        {shown.map((e, i) => (
+          // Index included: two events can legitimately share a frame, node and
+          // kind, and a colliding key corrupts the render rather than warning.
+          <li key={`${e.frame}-${e.nodeId}-${e.kind}-${i}`} data-sev={e.severity}>
+            <span className="feed-icon" aria-hidden="true">{icon(e)}</span>
+            <span className="feed-time">{e.atSec.toFixed(1)}s</span>
+            <span className="feed-body">
+              <strong>{e.headline}</strong>
+              <span className="muted"> {e.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Stat({ label, value, sub, state }: {
   label: string; value: string; sub?: string; state?: 'good' | 'bad';
 }) {
@@ -289,6 +366,7 @@ export function Hud({ state, grading }: { state: GameState; grading: Grade | nul
         />
       </div>
 
+      <EventFeed state={state} />
       <Sparkline state={state} />
       <Waterfall state={state} />
 
