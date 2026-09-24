@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { TriangleAlert } from 'lucide-react';
+import type { LatencyWaterfall } from '@nb/schema';
 import type { GameState, Grade } from './state';
 import { LEVEL } from './level';
 
@@ -22,41 +23,90 @@ const fmtMs = (n: number): string =>
  */
 function Sparkline({ state }: { state: GameState }) {
   const frames = state.result?.frames ?? [];
+  const ghostFrames = state.previousResult?.frames ?? [];
+
   const path = useMemo(() => {
     if (frames.length < 2) return null;
     const w = 300;
     const h = 64;
     const values = frames.map((f) => f.p99Ms);
-    const peak = Math.max(LEVEL.sloP99Ms * 1.4, ...values);
-    const x = (i: number): number => (i / (frames.length - 1)) * w;
+    const ghost = ghostFrames.map((f) => f.p99Ms);
+
+    /*
+     * Both runs share one scale, including the previous run's peak.
+     *
+     * Scaling each series to its own maximum would make every run look the
+     * same shape and turn an improvement into a flat line - the comparison has
+     * to be readable as a *gap*, which only works on a common axis.
+     */
+    const peak = Math.max(LEVEL.sloP99Ms * 1.4, ...values, ...ghost);
+
+    // Runs can differ in length, so each series is positioned by its own
+    // progress through its own run rather than by frame index.
+    const xOf = (i: number, n: number): number => (n <= 1 ? 0 : (i / (n - 1)) * w);
     const y = (v: number): number => h - (Math.min(v, peak) / peak) * h;
+    const toPath = (vs: readonly number[]): string =>
+      vs.map((v, i) => `${i === 0 ? 'M' : 'L'}${xOf(i, vs.length).toFixed(1)},${y(v).toFixed(1)}`)
+        .join(' ');
+
     return {
-      w, h, peak,
-      line: values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' '),
-      area: `M0,${h} ${values.map((v, i) => `L${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} L${w},${h} Z`,
+      w, h,
+      line: toPath(values),
+      ghostLine: ghost.length > 1 ? toPath(ghost) : null,
+      area: `M0,${h} ${values.map((v, i) => `L${xOf(i, values.length).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} L${w},${h} Z`,
       sloY: y(LEVEL.sloP99Ms),
-      headX: x(Math.max(0, state.playhead)),
+      headX: xOf(Math.max(0, state.playhead), values.length),
       headY: y(values[Math.max(0, state.playhead)] ?? 0),
     };
-  }, [frames, state.playhead]);
+  }, [frames, ghostFrames, state.playhead]);
 
   if (path === null) return null;
+
+  const current = state.result?.perClass['api-read']?.p99Ms;
+  const before = state.previousResult?.perClass['api-read']?.p99Ms;
+  const delta = current !== undefined && before !== undefined ? current - before : null;
 
   return (
     <div className="chart">
       <div className="chart-head">
         <span className="chart-title">p99 latency over the run</span>
-        <span className="chart-note">target under {LEVEL.sloP99Ms}ms</span>
+        <span className="chart-note">
+          {delta === null
+            ? `target under ${LEVEL.sloP99Ms}ms`
+            : <>vs previous <Delta ms={delta} /></>}
+        </span>
       </div>
       <svg viewBox={`0 0 ${path.w} ${path.h}`} className="sparkline" role="img"
-        aria-label={`p99 latency over time, target under ${LEVEL.sloP99Ms} milliseconds`}>
+        aria-label={delta === null
+          ? `p99 latency over time, target under ${LEVEL.sloP99Ms} milliseconds`
+          : `p99 latency over time compared with the previous run, ${fmtDelta(delta)}`}>
         <path d={path.area} className="sparkline-area" />
         {/* Recessive reference line: the chart's actual question. */}
         <line x1="0" x2={path.w} y1={path.sloY} y2={path.sloY} className="sparkline-slo" />
+        {/* The previous run, behind and quiet. Overlaid history is what makes a
+            readout an instrument rather than a number that changed. */}
+        {path.ghostLine !== null && (
+          <path d={path.ghostLine} className="sparkline-ghost" />
+        )}
         <path d={path.line} className="sparkline-line" />
         <circle cx={path.headX} cy={path.headY} r="3.5" className="sparkline-head" />
       </svg>
     </div>
+  );
+}
+
+/** Signed, with direction stated in words as well as sign and colour. */
+function fmtDelta(ms: number): string {
+  if (Math.abs(ms) < 0.5) return 'unchanged';
+  return ms < 0 ? `${fmtMs(-ms)} faster` : `${fmtMs(ms)} slower`;
+}
+
+function Delta({ ms }: { ms: number }) {
+  const dir = Math.abs(ms) < 0.5 ? 'same' : ms < 0 ? 'better' : 'worse';
+  return (
+    <span className="delta" data-dir={dir}>
+      {dir === 'same' ? '·' : dir === 'better' ? '▼' : '▲'} {fmtDelta(ms)}
+    </span>
   );
 }
 
@@ -68,23 +118,63 @@ function Sparkline({ state }: { state: GameState }) {
  * position in the ramp encodes position in the request path. A 2px surface gap
  * separates them so adjacent stages stay legible.
  */
-function Waterfall({ state }: { state: GameState }) {
-  const w = state.result?.attribution;
-  if (w === undefined) return null;
-
-  const rows = [
+/** The named contributions, in request order. Shared by both runs so the rows line up. */
+function contributions(w: LatencyWaterfall): readonly { label: string; ms: number }[] {
+  return [
     { label: 'DNS', ms: w.dnsMs },
     { label: 'TCP + TLS', ms: w.setupMs },
     { label: 'Network', ms: w.propagationMs },
     { label: 'Queueing', ms: w.queueMs },
     { label: 'Server work', ms: w.serviceMs },
     { label: 'Transfer', ms: w.transferMs },
-  ].filter((r) => r.ms > 0.01);
+  ];
+}
+
+/**
+ * Which contribution changed most between two runs, and by how much.
+ *
+ * Exported for test: the sign convention is easy to invert, and inverting it
+ * would tell the player to attack whichever part of the request they just
+ * improved.
+ */
+export function biggestMover(
+  before: LatencyWaterfall,
+  after: LatencyWaterfall,
+): { label: string; deltaMs: number } | null {
+  const a = contributions(before);
+  const b = contributions(after);
+  let best: { label: string; deltaMs: number } | null = null;
+  for (let i = 0; i < b.length; i++) {
+    const delta = (b[i]?.ms ?? 0) - (a[i]?.ms ?? 0);
+    if (Math.abs(delta) < 0.5) continue;
+    if (best === null || Math.abs(delta) > Math.abs(best.deltaMs)) {
+      best = { label: b[i]?.label ?? '', deltaMs: delta };
+    }
+  }
+  return best;
+}
+
+function Waterfall({ state }: { state: GameState }) {
+  const w = state.result?.attribution;
+  if (w === undefined) return null;
+
+  const previous = state.previousResult?.attribution;
+  const before = previous === undefined ? null : contributions(previous);
+
+  const rows = contributions(w)
+    .map((r, i) => ({
+      ...r,
+      // Paired by position, so a contribution that fell to zero still reports
+      // its drop rather than silently vanishing from the comparison.
+      deltaMs: before === null ? null : r.ms - (before[i]?.ms ?? 0),
+    }))
+    .filter((r) => r.ms > 0.01 || (r.deltaMs !== null && Math.abs(r.deltaMs) > 0.5));
 
   const total = rows.reduce((a, r) => a + r.ms, 0);
   if (total <= 0) return null;
 
   const dominant = rows.reduce((a, b) => (b.ms > a.ms ? b : a));
+  const mover = previous === undefined ? null : biggestMover(previous, w);
 
   return (
     <div className="chart">
@@ -118,13 +208,24 @@ function Waterfall({ state }: { state: GameState }) {
             />
             <span className="stack-legend-label">{r.label}</span>
             <span className="stack-legend-value">{fmtMs(r.ms)}</span>
+            {r.deltaMs !== null && (
+              <span className="stack-legend-delta">
+                {Math.abs(r.deltaMs) < 0.5
+                  ? <span className="delta" data-dir="same">·</span>
+                  : <Delta ms={r.deltaMs} />}
+              </span>
+            )}
           </li>
         ))}
       </ul>
 
       <p className="chart-caption">
-        <strong>{dominant.label}</strong> is the biggest cost here. Change that and the
-        number moves; change anything else and it will not.
+        {mover === null
+          ? <><strong>{dominant.label}</strong> is the biggest cost here. Change that and
+              the number moves; change anything else and it will not.</>
+          : <><strong>{mover.label}</strong> moved most since your last run
+              — {fmtDelta(mover.deltaMs)}. <strong>{dominant.label}</strong> is now the
+              biggest remaining cost.</>}
       </p>
     </div>
   );
