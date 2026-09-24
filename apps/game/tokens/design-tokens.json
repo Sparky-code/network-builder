@@ -72,7 +72,8 @@
       "on-primary": { "$value": "oklch(0.98 0.005 260)", "$type": "color" },
       "success": { "$value": "oklch(0.55 0.10 145)", "$type": "color" },
       "warning": { "$value": "oklch(0.72 0.13 80)", "$type": "color" },
-      "danger": { "$value": "oklch(0.55 0.18 25)", "$type": "color" }
+      "danger": { "$value": "oklch(0.55 0.18 25)", "$type": "color" },
+      "alarm": { "$value": "oklch(0.62 0.21 40)", "$type": "color" }
     },
     "dark": {
       "background": { "$value": "oklch(0.16 0.004 285)", "$type": "color" },
@@ -86,7 +87,8 @@
       "on-primary": { "$value": "oklch(0.14 0.01 260)", "$type": "color" },
       "success": { "$value": "oklch(0.75 0.12 145)", "$type": "color" },
       "warning": { "$value": "oklch(0.80 0.13 80)", "$type": "color" },
-      "danger": { "$value": "oklch(0.72 0.16 25)", "$type": "color" }
+      "danger": { "$value": "oklch(0.72 0.16 25)", "$type": "color" },
+      "alarm": { "$value": "oklch(0.76 0.18 40)", "$type": "color" }
     }
   },
   "elevation": {
