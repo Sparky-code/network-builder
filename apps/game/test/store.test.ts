@@ -125,3 +125,35 @@ describe('level phases', () => {
     expect(store.getSnapshot().best).toEqual(best);
   });
 });
+
+describe('placing components', () => {
+  beforeEach(() => { store.reset(); });
+
+  it('never stacks two components on the same spot', () => {
+    // The old behaviour used a constant per palette row, so a second origin
+    // landed exactly on top of the first and looked like nothing happened.
+    for (let i = 0; i < 5; i++) store.addNode('origin', store.nextFreePosition());
+    const positions = Object.values(store.getSnapshot().positions);
+    const keys = positions.map((p) => `${p.x},${p.y}`);
+    expect(keys).toEqual([...new Set(keys)]);
+  });
+
+  it('keeps placed components clear of each other', () => {
+    for (let i = 0; i < 4; i++) store.addNode('origin', store.nextFreePosition());
+    const ps = Object.values(store.getSnapshot().positions);
+    for (let i = 0; i < ps.length; i++) {
+      for (let j = i + 1; j < ps.length; j++) {
+        const a = ps[i]!; const b = ps[j]!;
+        const clear = Math.abs(a.x - b.x) >= 208 || Math.abs(a.y - b.y) >= 66;
+        expect(clear).toBe(true);
+      }
+    }
+  });
+
+  it('honours an explicit position, which is what a drop provides', () => {
+    store.addNode('origin', { x: 742, y: 191 });
+    const added = Object.entries(store.getSnapshot().positions)
+      .find(([id]) => id.startsWith('origin-'));
+    expect(added?.[1]).toEqual({ x: 742, y: 191 });
+  });
+});
