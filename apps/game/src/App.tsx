@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  Background, Controls, ReactFlow, ReactFlowProvider,
+  Background, Controls, ReactFlow, ReactFlowProvider, useReactFlow,
   type Connection, type Edge, type Node, type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -14,7 +14,7 @@ import { StationNode, type StationNodeData } from './game/StationNode';
 import { TrafficEdge } from './game/TrafficEdge';
 import { PacketOverlay } from './game/PacketOverlay';
 import { Hud } from './game/Hud';
-import { Palette } from './game/Palette';
+import { DRAG_TYPE, Palette } from './game/Palette';
 import { Inspector } from './game/Inspector';
 import './game/game.css';
 
@@ -54,6 +54,10 @@ function describe(state: GameState, id: string): { metric: string; detail: strin
 }
 
 function Canvas({ state }: { state: GameState }) {
+  // Converts a cursor position into canvas coordinates, so a component is
+  // created where it was dropped rather than at a constant.
+  const { screenToFlowPosition } = useReactFlow();
+
   const nodes = useMemo<Node<StationNodeData>[]>(() => state.topology.nodes.map((n) => {
     const type = nodeTypeOf(state, n.id as string);
     const id = n.id as string;
@@ -100,6 +104,21 @@ function Canvas({ state }: { state: GameState }) {
     <ReactFlow
       nodes={nodes}
       edges={edges}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={(e) => {
+        const typeId = e.dataTransfer.getData(DRAG_TYPE);
+        if (typeId === '') return;
+        e.preventDefault();
+        // The drop point is the cursor; the node is anchored top-left, so
+        // offset by half the box to land under the pointer rather than
+        // beside it.
+        const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        store.addNode(typeId, { x: p.x - 104, y: p.y - 33 });
+      }}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       fitView

@@ -149,6 +149,29 @@ class Store {
 
   select = (id: string | null): void => this.set({ selected: id });
 
+  /**
+   * Somewhere free, for the keyboard and click path.
+   *
+   * Dragging gives an exact point; clicking has no point to give, so the least
+   * surprising thing is a spot that is at least empty. The previous behaviour
+   * used a constant, so a second component of the same kind landed exactly on
+   * top of the first.
+   */
+  nextFreePosition = (): Position => {
+    const taken = Object.values(this.state.positions);
+    const CLEAR_X = 260;
+    const CLEAR_Y = 96;
+    for (let row = 0; row < 12; row++) {
+      for (const x of [300, 560, 40]) {
+        const y = 80 + row * CLEAR_Y;
+        const clash = taken.some((p) =>
+          Math.abs(p.x - x) < CLEAR_X && Math.abs(p.y - y) < CLEAR_Y);
+        if (!clash) return { x, y };
+      }
+    }
+    return { x: 300, y: 80 };
+  };
+
   addNode = (typeId: string, position: Position): void => {
     const type = CATALOG.get(typeId as ComponentTypeId);
     if (type === undefined) return;
