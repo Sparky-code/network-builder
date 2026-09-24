@@ -291,7 +291,7 @@
   background: var(--color-primary);
   transition: background var(--duration-normal) var(--easing-standard);
 }
-.station[data-saturated="true"] .station-load-fill { background: var(--color-danger); }
+.station[data-saturated="true"] .station-load-fill { background: var(--color-alarm); }
 
 /*
  * The queue tank: backlog as an accumulating quantity, not the percentage the
@@ -357,7 +357,7 @@
    lid, so the state never rides on hue alone. */
 .station[data-queue-state="shedding"] .station-queue {
   border-style: dashed;
-  border-color: color-mix(in oklab, var(--color-danger) 60%, var(--hairline));
+  border-color: color-mix(in oklab, var(--color-alarm) 60%, var(--hairline));
 }
 .station[data-queue-state="shedding"] .station-queue::before {
   content: "";
@@ -365,15 +365,15 @@
   z-index: 2;
   top: 0; left: -1px; right: -1px;
   height: 3px;
-  background: var(--color-danger);
+  background: var(--color-alarm);
 }
 .station[data-queue-state="shedding"] .station-queue-fill {
   background: repeating-linear-gradient(
     to top,
-    var(--color-danger) 0px,
-    var(--color-danger) 3px,
-    color-mix(in oklab, var(--color-danger) 45%, var(--surface-sunken)) 3px,
-    color-mix(in oklab, var(--color-danger) 45%, var(--surface-sunken)) 5px
+    var(--color-alarm) 0px,
+    var(--color-alarm) 3px,
+    color-mix(in oklab, var(--color-alarm) 45%, var(--surface-sunken)) 3px,
+    color-mix(in oklab, var(--color-alarm) 45%, var(--surface-sunken)) 5px
   );
 }
 
@@ -391,7 +391,7 @@
   font-variant-numeric: tabular-nums;
 }
 .station-queue-count:empty { display: none; }
-.station[data-queue-state="shedding"] .station-queue-count { color: var(--color-danger); }
+.station[data-queue-state="shedding"] .station-queue-count { color: var(--color-alarm); }
 
 .station-handle {
   width: 9px;
@@ -591,7 +591,7 @@
 .stack-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .stack-legend li {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--type-label-medium-size);
@@ -694,3 +694,37 @@
 .inspector { display: flex; flex-direction: column; gap: var(--space-3); }
 .inspector-title { font-weight: var(--type-label-large-weight); font-size: var(--type-label-large-size); }
 .inspector-summary { font-size: var(--type-label-medium-size); line-height: var(--type-body-medium-line-height); }
+
+/*
+ * The previous run, drawn behind the current one. Deliberately recessive: it is
+ * context, not a second subject. Dashed as well as dimmed so the comparison
+ * survives both themes and does not rely on colour alone.
+ */
+.sparkline-ghost {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.5;
+}
+
+.delta { font-variant-numeric: tabular-nums; }
+.delta[data-dir="better"] { color: var(--color-success); }
+.delta[data-dir="worse"] { color: var(--color-danger); }
+.delta[data-dir="same"] { color: var(--color-text-muted); }
+
+.stack-legend-delta {
+  min-width: 84px;
+  text-align: right;
+  font-size: var(--type-label-medium-size);
+}
+
+/*
+ * A station that is shedding keeps announcing it, not just at the moment the
+ * canvas ring fires. Border weight and the alarm hue together, so the state
+ * does not rely on colour alone.
+ */
+.station[data-queue-state="shedding"] {
+  border-color: var(--color-alarm);
+  box-shadow: 0 0 0 1px var(--color-alarm), var(--elevation-3);
+}

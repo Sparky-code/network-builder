@@ -80,6 +80,7 @@
   --color-success: oklch(0.55 0.10 145);
   --color-warning: oklch(0.72 0.13 80);
   --color-danger: oklch(0.55 0.18 25);
+  --color-alarm: oklch(0.62 0.21 40);
 }
 
 :root[data-theme='light'] {
@@ -95,6 +96,7 @@
   --color-success: oklch(0.55 0.10 145);
   --color-warning: oklch(0.72 0.13 80);
   --color-danger: oklch(0.55 0.18 25);
+  --color-alarm: oklch(0.62 0.21 40);
 }
 
 :root[data-theme='dark'] {
@@ -110,4 +112,5 @@
   --color-success: oklch(0.75 0.12 145);
   --color-warning: oklch(0.80 0.13 80);
   --color-danger: oklch(0.72 0.16 25);
+  --color-alarm: oklch(0.76 0.18 40);
 }
