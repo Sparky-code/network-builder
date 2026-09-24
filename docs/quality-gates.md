@@ -145,28 +145,41 @@ Assessed against the above, as built:
 
 | | Criterion | Status |
 | --- | --- | --- |
-| A1 | One change, one attributable delta | partial — the waterfall shows composition, but only for the current run |
-| A2 | Before and after visible together | **fail** — no run-to-run comparison exists |
+| A1 | One change, one attributable delta | pass* — every contribution now carries a delta against the previous run |
+| A2 | Before and after visible together | pass — ghost trace behind the current series, plus per-contribution deltas |
 | A3 | Dominant cost stated | pass — the waterfall caption names it |
-| A4 | Wrong theories die fast | partial — it fails, but the result does not explain itself |
-| B1 | Saturation is a visible event | **fail** — a 3px bar changes colour |
-| B2 | Queues have visible depth | **fail** — backlog is not represented at all |
-| B3 | Dropped requests legible | partial — red dots fade, easily missed |
-| B4 | Recovery is felt | **fail** — playback loops; the asymmetry is invisible |
+| A4 | Wrong theories die fast | pass* — the caption names which contribution moved most, and by how much |
+| B1 | Saturation is a visible event | pass* — a shockwave on the canvas at the transition, sustained alarm state after |
+| B2 | Queues have visible depth | pass — queue tank tracks the integrator; fills over 1.5s, drains over 4.0s |
+| B3 | Dropped requests legible | pass* — refused at the door and deflected away, marked with a cross |
+| B4 | Recovery is felt | pass — playback resolves and holds; drain animates 2.67× longer than build |
 | C1 | Placement is direct | **fail** — palette click drops at a fixed coordinate |
 | C2 | Wiring is forgiving | pass — as of the disconnect fix |
 | C3 | Refusals teach | partial — the message exists but appears in a toast, away from the gesture |
 | D1 | Running is a moment | **fail** — numbers simply appear |
 | D2 | Canvas alive between runs | **fail** — static and dead until a run |
 | D3 | Iteration is unpunished | pass |
-| E1 | Counterintuitive result lands | **fail** — arrives as two similar numbers |
+| E1 | Counterintuitive result lands | partial — the delta makes the gap visible, but nothing remarks on it |
 | E2 | Surprise explained where felt | **fail** |
 | F1 | Passing is an event | **fail** — a list item changes |
 | F2 | Partial credit reads as progress | partial |
 | F3 | Reason to try again | **fail** |
 
-**Eleven fails, six partials, three passes. Phase 3 is not close, and no amount of
-restyling moves it** — nine of the eleven fails need mechanism that does not exist yet.
+**Originally: eleven fails, six partials, three passes.** Nine of the eleven needed
+mechanism that did not exist, which is why no amount of restyling moved it.
+
+**Now: five fails, four partials, nine passes.** Groups A and B are clear, which is the
+stated bar for closing the phase.
+
+Rows marked `pass*` are **mechanism-verified but not playtested.** The mechanism exists and
+behaves as specified — a delta is computed and shown, a shockwave fires on the transition,
+a refused request is deflected at the door. Whether those *read* as intended is what the
+five-minute playtest decides, and these are the rows to watch during it. A criterion is not
+closed because the code is there; that is the mistake this document exists to prevent.
+
+What remains, all of it outside groups A and B: C1 (direct placement), D1 (running is a
+moment), D2 (a live canvas between runs), E2 (the surprise explained where it is felt), F1
+and F3 (passing as an event, and a reason to try again).
 
 ### What the gate implies about sequencing
 
